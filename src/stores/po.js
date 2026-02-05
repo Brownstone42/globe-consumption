@@ -8,6 +8,16 @@ export const usePoStore = defineStore('po', {
         loading: false,
     }),
 
+    getters: {
+        sortedOrders: (state) => {
+            return [...state.orders].sort((a, b) => {
+                const dateA = new Date(a.date)
+                const dateB = new Date(b.date)
+                return dateB - dateA // Descending
+            })
+        },
+    },
+
     actions: {
         async fetchOrders() {
             this.loading = true

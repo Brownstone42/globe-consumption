@@ -6,6 +6,62 @@
                 <h1 class="title is-4">Customer Management</h1>
             </div>
             <div class="level-right">
+                <!-- Search Filter (Name) -->
+                <div class="field mr-2 mb-0">
+                    <div class="control has-icons-left">
+                        <input
+                            class="input"
+                            type="text"
+                            v-model="searchQuery"
+                            placeholder="Search name..."
+                            @input="currentPage = 1"
+                        />
+                        <span class="icon is-small is-left">
+                            <i class="fas fa-search"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Search Filter (Code) -->
+                <div class="field mr-4 mb-0">
+                    <div class="control has-icons-left">
+                        <input
+                            class="input"
+                            type="text"
+                            v-model="searchCodeQuery"
+                            placeholder="Search code..."
+                            @input="currentPage = 1"
+                        />
+                        <span class="icon is-small is-left">
+                            <i class="fas fa-tag"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Pagination Controls -->
+                <div class="field has-addons mr-4 mb-0" v-if="totalPages > 1">
+                    <p class="control">
+                        <button class="button" @click="currentPage--" :disabled="currentPage === 1">
+                            <span class="icon"><i class="fas fa-chevron-left"></i></span>
+                        </button>
+                    </p>
+                    <p class="control">
+                        <button class="button is-static">
+                            {{ currentPage }} / {{ totalPages }}
+                        </button>
+                    </p>
+                    <p class="control">
+                        <button
+                            class="button"
+                            @click="currentPage++"
+                            :disabled="currentPage === totalPages"
+                        >
+                            <span class="icon"><i class="fas fa-chevron-right"></i></span>
+                        </button>
+                    </p>
+                </div>
+
+                <!-- Add Button -->
                 <button class="button is-primary" @click="openModal()">
                     <span class="icon"><i class="fas fa-plus"></i></span>
                     <span>Add Customer</span>
@@ -16,13 +72,43 @@
         <!-- ตารางแสดงข้อมูล -->
         <div class="box">
             <div class="table-container">
-                <table class="table is-fullwidth is-striped is-hoverable">
+                <table class="table is-fullwidth is-striped is-hoverable is-fixed-layout">
                     <thead>
                         <tr>
-                            <th>Code</th>
-                            <th>Name</th>
-                            <th>Status</th>
-                            <th class="has-text-centered" style="width: 120px">Actions</th>
+                            <th class="is-clickable col-code" @click="toggleSort('code')">
+                                Code
+                                <span class="icon is-small ml-1">
+                                    <i
+                                        v-if="sortKey !== 'code'"
+                                        class="fas fa-sort has-text-grey-light"
+                                    ></i>
+                                    <i
+                                        v-else
+                                        :class="[
+                                            'fas',
+                                            sortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                                        ]"
+                                    ></i>
+                                </span>
+                            </th>
+                            <th class="is-clickable col-name" @click="toggleSort('name')">
+                                Name
+                                <span class="icon is-small ml-1">
+                                    <i
+                                        v-if="sortKey !== 'name'"
+                                        class="fas fa-sort has-text-grey-light"
+                                    ></i>
+                                    <i
+                                        v-else
+                                        :class="[
+                                            'fas',
+                                            sortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                                        ]"
+                                    ></i>
+                                </span>
+                            </th>
+                            <th class="col-status">Status</th>
+                            <th class="has-text-centered col-actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -34,11 +120,11 @@
                                 <p>Loading...</p>
                             </td>
                         </tr>
-                        <tr v-else v-for="customer in customers" :key="customer.id">
-                            <td>
+                        <tr v-else v-for="customer in paginatedCustomers" :key="customer.id">
+                            <td class="has-text-overflow">
                                 <strong>{{ customer.code }}</strong>
                             </td>
-                            <td>{{ customer.name }}</td>
+                            <td class="has-text-overflow">{{ customer.name }}</td>
                             <td>
                                 <span
                                     class="tag"
@@ -68,13 +154,18 @@
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="!loading && customers.length === 0">
+                        <tr v-if="!loading && filteredCustomers.length === 0">
                             <td colspan="4" class="has-text-centered has-text-grey py-5">
-                                No customers found. Click "Add Customer" to create one.
+                                No customers found matching your criteria.
                             </td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <!-- Show total counts -->
+            <div class="is-size-7 has-text-grey mt-2" v-if="!loading">
+                Showing {{ paginatedCustomers.length }} of {{ filteredCustomers.length }} customers
+                (Sorted by {{ sortKey }} {{ sortOrder }})
             </div>
         </div>
 
@@ -155,6 +246,12 @@ export default {
             isModalActive: false,
             isEditing: false,
             editingId: null,
+            searchQuery: '',
+            searchCodeQuery: '',
+            currentPage: 1,
+            itemsPerPage: 10,
+            sortKey: 'name', // เริ่มต้นด้วย name
+            sortOrder: 'asc', // เริ่มต้นด้วย asc
             form: {
                 code: '',
                 name: '',
@@ -164,6 +261,44 @@ export default {
     },
     computed: {
         ...mapState(useCustomerStore, ['customers', 'loading']),
+
+        filteredCustomers() {
+            let result = [...this.customers]
+
+            // 1. Filter by Name
+            if (this.searchQuery) {
+                const query = this.searchQuery.toLowerCase()
+                result = result.filter((c) => c.name && c.name.toLowerCase().includes(query))
+            }
+
+            // 2. Filter by Code
+            if (this.searchCodeQuery) {
+                const query = this.searchCodeQuery.toLowerCase()
+                result = result.filter((c) => c.code && c.code.toLowerCase().includes(query))
+            }
+
+            // 3. Sort
+            result.sort((a, b) => {
+                const valA = (a[this.sortKey] || '').toString().toLowerCase()
+                const valB = (b[this.sortKey] || '').toString().toLowerCase()
+
+                if (valA < valB) return this.sortOrder === 'asc' ? -1 : 1
+                if (valA > valB) return this.sortOrder === 'asc' ? 1 : -1
+                return 0
+            })
+
+            return result
+        },
+
+        totalPages() {
+            return Math.ceil(this.filteredCustomers.length / this.itemsPerPage) || 1
+        },
+
+        paginatedCustomers() {
+            const start = (this.currentPage - 1) * this.itemsPerPage
+            const end = start + this.itemsPerPage
+            return this.filteredCustomers.slice(start, end)
+        },
     },
     methods: {
         ...mapActions(useCustomerStore, [
@@ -172,6 +307,16 @@ export default {
             'updateCustomer',
             'deleteCustomer',
         ]),
+
+        toggleSort(key) {
+            if (this.sortKey === key) {
+                this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'
+            } else {
+                this.sortKey = key
+                this.sortOrder = 'asc'
+            }
+            this.currentPage = 1 // Reset to first page on sort
+        },
 
         openModal(customer = null) {
             if (customer) {
@@ -225,5 +370,60 @@ export default {
 .table td,
 .table th {
     vertical-align: middle;
+}
+
+.is-fixed-layout {
+    table-layout: fixed;
+}
+
+.col-code {
+    width: 150px;
+}
+
+.col-name {
+    width: auto; /* Take remaining space */
+}
+
+.col-status {
+    width: 120px;
+}
+
+.col-actions {
+    width: 120px;
+}
+
+.has-text-overflow {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.is-clickable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.is-clickable:hover {
+    background-color: #f5f5f5;
+}
+
+/* Adjustments for level on mobile */
+@media screen and (max-width: 768px) {
+    .level-right {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .level-right .field {
+        margin-right: 0 !important;
+        margin-bottom: 0.75rem !important;
+    }
+
+    .is-fixed-layout {
+        table-layout: auto; /* Fallback for mobile if columns are too many */
+    }
+
+    .col-code {
+        width: 100px;
+    }
 }
 </style>

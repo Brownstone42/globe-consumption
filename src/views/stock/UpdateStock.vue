@@ -16,13 +16,13 @@
                 <div class="column is-narrow">
                     <div class="field">
                         <label class="label">Count Date</label>
-                        <div class="control">
-                            <input
-                                class="input"
-                                type="date"
+                        <div class="control" style="width: 250px">
+                            <!-- VueDatePicker implementation -->
+                            <VueDatePicker
                                 v-model="countDate"
-                                style="max-width: 250px"
-                            />
+                                :formats="{ input: 'yyyy/MM/dd' }"
+                                :auto-apply="true"
+                            ></VueDatePicker>
                         </div>
                     </div>
                 </div>
@@ -72,7 +72,7 @@
                             <td>{{ product.name }}</td>
                             <td>
                                 <span class="tag is-light">{{
-                                    getLastUpdate(product.id).countDate || 'N/A'
+                                    formatDate(getLastUpdate(product.id).countDate) || 'N/A'
                                 }}</span>
                             </td>
                             <td class="has-text-right has-text-weight-bold">
@@ -121,15 +121,17 @@
 import { mapState, mapActions } from 'pinia'
 import { useProductStore } from '../../stores/products'
 import { useStockStore } from '../../stores/stock'
-import { useCategoryStore } from '../../stores/categories' // 1. Import Category Store
+import { useCategoryStore } from '../../stores/categories'
+// REMOVED local import
 
 export default {
     name: 'UpdateStock',
+    // REMOVED local components
     data() {
         return {
-            countDate: new Date().toISOString().substr(0, 10),
+            countDate: this.getTodayString(),
             stockQuantities: {},
-            filterCategoryId: '', // 2. Add filter state
+            filterCategoryId: '',
         }
     },
     computed: {
@@ -141,12 +143,11 @@ export default {
             lastUpdates: 'lastUpdates',
             stockLoading: 'loading',
         }),
-        ...mapState(useCategoryStore, ['categories']), // 3. Map categories state
+        ...mapState(useCategoryStore, ['categories']),
 
-        // 4. Create computed property to filter products
         filteredProducts() {
             if (!this.filterCategoryId) {
-                return this.products // No filter selected, return all
+                return this.products
             }
             return this.products.filter((p) => p.categoryId === this.filterCategoryId)
         },
@@ -154,7 +155,37 @@ export default {
     methods: {
         ...mapActions(useProductStore, ['fetchProducts']),
         ...mapActions(useStockStore, ['recordStockUpdate', 'fetchLastStockUpdates']),
-        ...mapActions(useCategoryStore, ['fetchCategories']), // 5. Map fetchCategories action
+        ...mapActions(useCategoryStore, ['fetchCategories']),
+
+        getTodayString() {
+            const d = new Date()
+            const year = d.getFullYear()
+            const month = String(d.getMonth() + 1).padStart(2, '0')
+            const day = String(d.getDate()).padStart(2, '0')
+            return `${year}-${month}-${day}`
+        },
+
+        formatDate(dateVal) {
+            if (!dateVal) return ''
+
+            let date = dateVal
+            // Handle Firestore Timestamp
+            if (dateVal && typeof dateVal.toDate === 'function') {
+                date = dateVal.toDate()
+            }
+            // Handle String or Number
+            else if (!(dateVal instanceof Date)) {
+                date = new Date(dateVal)
+            }
+
+            if (isNaN(date.getTime())) return ''
+
+            // Format as YYYY-MM-DD
+            const year = date.getFullYear()
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            const day = String(date.getDate()).padStart(2, '0')
+            return `${year}-${month}-${day}`
+        },
 
         getLastUpdate(productId) {
             return this.lastUpdates[productId] || {}
@@ -192,7 +223,7 @@ export default {
     mounted() {
         this.fetchProducts()
         this.fetchLastStockUpdates()
-        this.fetchCategories() // 6. Fetch categories on load
+        this.fetchCategories()
     },
 }
 </script>

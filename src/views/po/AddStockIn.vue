@@ -3,23 +3,19 @@
         <!-- Header -->
         <div class="level mb-4">
             <div class="level-left">
-                <h1 class="title is-4">Purchase Order List</h1>
+                <h1 class="title is-4">Stock In (Purchase to Stock)</h1>
             </div>
             <div class="level-right">
                 <button class="button is-primary" @click="openModal()">
                     <span class="icon"><i class="fas fa-plus"></i></span>
-                    <span>Add PO</span>
+                    <span>Add Stock In</span>
                 </button>
             </div>
         </div>
 
-        <!-- Warning Message -->
-        <div class="notification is-warning is-light">
-            <button class="delete"></button>
-            <strong>Warning:</strong> Do NOT delete POs that belong to the same month as your last
-            <strong>Stock Count (Update Stock)</strong>. The system needs these POs to accurately
-            calculate remaining stock for that specific month. You can safely delete POs from older
-            months after syncing them to Sales History.
+        <div class="notification is-info is-light">
+            Record items purchased to replenish your stock. These will be added to your current
+            stock calculation if they were received after the last stock count.
         </div>
 
         <!-- Table -->
@@ -28,9 +24,8 @@
                 <table class="table is-fullwidth is-striped is-hoverable">
                     <thead>
                         <tr>
-                            <th>Order ID</th>
                             <th>Date</th>
-                            <th>Company Name</th>
+                            <th>Reference/Invoice</th>
                             <th>Product Name</th>
                             <th>Quantity</th>
                             <th class="has-text-centered">Actions</th>
@@ -38,41 +33,40 @@
                     </thead>
                     <tbody>
                         <tr v-if="loading">
-                            <td colspan="6" class="has-text-centered py-5">
+                            <td colspan="5" class="has-text-centered py-5">
                                 <span class="icon is-large"
                                     ><i class="fas fa-spinner fa-pulse fa-2x"></i
                                 ></span>
                                 <p>Loading...</p>
                             </td>
                         </tr>
-                        <tr v-else v-for="order in sortedOrders" :key="order.id">
-                            <td>
-                                <strong>{{ order.orderId }}</strong>
+                        <tr v-else v-for="record in stockInRecords" :key="record.id">
+                            <td>{{ formatDate(record.date) }}</td>
+                            <td>{{ record.reference || '-' }}</td>
+                            <td>{{ getProductName(record.productId) }}</td>
+                            <td class="has-text-weight-bold has-text-success">
+                                +{{ record.quantity }}
                             </td>
-                            <td>{{ formatDate(order.date) }}</td>
-                            <td>{{ getCustomerName(order.customerId) }}</td>
-                            <td>{{ getProductName(order.productId) }}</td>
-                            <td>{{ order.quantity }}</td>
                             <td class="has-text-centered">
                                 <div class="buttons is-centered are-small">
                                     <button
                                         class="button is-info is-light"
-                                        @click="openModal(order)"
+                                        @click="openModal(record)"
                                     >
                                         <span class="icon"><i class="fas fa-edit"></i></span>
                                     </button>
                                     <button
                                         class="button is-danger is-light"
-                                        @click="deleteOrder(order.id)"
+                                        @click="deleteStockIn(record.id)"
                                     >
                                         <span class="icon"><i class="fas fa-trash"></i></span>
                                     </button>
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="!loading && sortedOrders.length === 0">
-                            <td colspan="6" class="has-text-centered has-text-grey py-5">
-                                No Purchase Orders found.
+                        <tr v-if="!loading && stockInRecords.length === 0">
+                            <td colspan="5" class="has-text-centered has-text-grey py-5">
+                                No Stock In records found.
                             </td>
                         </tr>
                     </tbody>
@@ -85,28 +79,18 @@
             <div class="modal-background" @click="closeModal"></div>
             <div class="modal-card" style="overflow: visible">
                 <header class="modal-card-head">
-                    <p class="modal-card-title">{{ isEditing ? 'Edit PO' : 'Add PO' }}</p>
+                    <p class="modal-card-title">
+                        {{ isEditing ? 'Edit Stock In' : 'Add Stock In' }}
+                    </p>
                     <button class="delete" aria-label="close" @click="closeModal"></button>
                 </header>
                 <section class="modal-card-body" style="overflow: visible">
-                    <!-- 1. Order ID -->
+                    <!-- Date -->
                     <div class="field">
-                        <label class="label">Order ID <span class="has-text-danger">*</span></label>
+                        <label class="label"
+                            >Received Date <span class="has-text-danger">*</span></label
+                        >
                         <div class="control">
-                            <input
-                                class="input"
-                                type="text"
-                                v-model="form.orderId"
-                                placeholder="e.g. PO-2023-001"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- 2. Date -->
-                    <div class="field">
-                        <label class="label">Date <span class="has-text-danger">*</span></label>
-                        <div class="control">
-                            <!-- VueDatePicker implementation -->
                             <VueDatePicker
                                 v-model="form.date"
                                 :formats="{ input: 'yyyy/MM/dd' }"
@@ -115,53 +99,20 @@
                         </div>
                     </div>
 
-                    <!-- 3 & 4. Company (Code & Name) -->
-                    <div class="columns">
-                        <div class="column">
-                            <div class="field">
-                                <label class="label"
-                                    >Company Code <span class="has-text-danger">*</span></label
-                                >
-                                <div class="control">
-                                    <div class="select is-fullwidth">
-                                        <select v-model="form.customerId">
-                                            <option value="" disabled>Select Code</option>
-                                            <option
-                                                v-for="cust in sortedCustomersByCode"
-                                                :key="cust.id"
-                                                :value="cust.id"
-                                            >
-                                                {{ cust.code }}
-                                            </option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="column">
-                            <div class="field">
-                                <label class="label"
-                                    >Company Name <span class="has-text-danger">*</span></label
-                                >
-                                <div class="control">
-                                    <div class="select is-fullwidth">
-                                        <select v-model="form.customerId">
-                                            <option value="" disabled>Select Name</option>
-                                            <option
-                                                v-for="cust in sortedCustomers"
-                                                :key="cust.id"
-                                                :value="cust.id"
-                                            >
-                                                {{ cust.name }}
-                                            </option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
+                    <!-- Reference -->
+                    <div class="field">
+                        <label class="label">Reference / Invoice No.</label>
+                        <div class="control">
+                            <input
+                                class="input"
+                                type="text"
+                                v-model="form.reference"
+                                placeholder="e.g. INV-2023-001"
+                            />
                         </div>
                     </div>
 
-                    <!-- 5 & 6. Product (Code & Name) -->
+                    <!-- Product Selectors -->
                     <div class="columns">
                         <div class="column">
                             <div class="field">
@@ -173,7 +124,7 @@
                                         <select v-model="form.productId">
                                             <option value="" disabled>Select Code</option>
                                             <option
-                                                v-for="prod in sortedProductsByCode"
+                                                v-for="prod in products"
                                                 :key="prod.id"
                                                 :value="prod.id"
                                             >
@@ -194,7 +145,7 @@
                                         <select v-model="form.productId">
                                             <option value="" disabled>Select Name</option>
                                             <option
-                                                v-for="prod in sortedProducts"
+                                                v-for="prod in products"
                                                 :key="prod.id"
                                                 :value="prod.id"
                                             >
@@ -237,68 +188,49 @@
 
 <script>
 import { mapState, mapActions } from 'pinia'
-import { usePoStore } from '../../stores/po'
-import { useCustomerStore } from '../../stores/customers'
+import { useStockInStore } from '../../stores/stockIn'
 import { useProductStore } from '../../stores/products'
-// REMOVED local import
 
 export default {
-    name: 'AddPO',
-    // REMOVED local components
+    name: 'AddStockIn',
     data() {
         return {
             isModalActive: false,
             isEditing: false,
             editingId: null,
             form: {
-                orderId: '',
                 date: '',
-                customerId: '',
                 productId: '',
                 quantity: 0,
+                reference: '',
             },
         }
     },
     computed: {
-        ...mapState(usePoStore, ['orders', 'loading', 'sortedOrders']),
-        ...mapState(useCustomerStore, ['customers', 'sortedCustomers', 'sortedCustomersByCode']),
-        ...mapState(useProductStore, ['products', 'sortedProducts', 'sortedProductsByCode']),
+        ...mapState(useStockInStore, ['stockInRecords', 'loading']),
+        ...mapState(useProductStore, ['products']),
     },
     methods: {
-        ...mapActions(usePoStore, ['fetchOrders', 'addOrder', 'updateOrder', 'deleteOrder']),
-        ...mapActions(useCustomerStore, ['fetchCustomers']),
+        ...mapActions(useStockInStore, [
+            'fetchStockInRecords',
+            'addStockIn',
+            'updateStockIn',
+            'deleteStockIn',
+        ]),
         ...mapActions(useProductStore, ['fetchProducts']),
 
-        getCustomerName(id) {
-            const found = this.customers.find((c) => c.id === id)
-            return found ? found.name : '-'
-        },
         getProductName(id) {
             const found = this.products.find((p) => p.id === id)
             return found ? found.name : '-'
         },
-        formatDate(dateVal) {
-            if (!dateVal) return ''
-
-            let date = dateVal
-            // Handle Firestore Timestamp
-            if (dateVal && typeof dateVal.toDate === 'function') {
-                date = dateVal.toDate()
+        formatDate(dateStr) {
+            if (!dateStr) return ''
+            if (typeof dateStr === 'string') return dateStr.split('T')[0]
+            if (dateStr instanceof Date) {
+                return dateStr.toISOString().split('T')[0]
             }
-            // Handle String or Number
-            else if (!(dateVal instanceof Date)) {
-                date = new Date(dateVal)
-            }
-
-            if (isNaN(date.getTime())) return ''
-
-            // Format as YYYY-MM-DD
-            const year = date.getFullYear()
-            const month = String(date.getMonth() + 1).padStart(2, '0')
-            const day = String(date.getDate()).padStart(2, '0')
-            return `${year}-${month}-${day}`
+            return ''
         },
-
         getTodayString() {
             const d = new Date()
             const year = d.getFullYear()
@@ -306,76 +238,53 @@ export default {
             const day = String(d.getDate()).padStart(2, '0')
             return `${year}-${month}-${day}`
         },
-
-        openModal(order = null) {
-            if (order) {
+        openModal(record = null) {
+            if (record) {
                 this.isEditing = true
-                this.editingId = order.id
-                this.form = { ...order }
+                this.editingId = record.id
+                this.form = { ...record }
             } else {
                 this.isEditing = false
                 this.editingId = null
                 this.form = {
-                    orderId: '',
                     date: this.getTodayString(),
-                    customerId: '',
                     productId: '',
                     quantity: 0,
+                    reference: '',
                 }
             }
             this.isModalActive = true
         },
-
         closeModal() {
             this.isModalActive = false
-            this.form = { orderId: '', date: '', customerId: '', productId: '', quantity: 0 }
         },
-
         async submitForm() {
-            if (
-                !this.form.orderId ||
-                !this.form.date ||
-                !this.form.customerId ||
-                !this.form.productId ||
-                this.form.quantity <= 0
-            ) {
-                alert('Please fill in all required fields and ensure quantity is greater than 0.')
+            if (!this.form.date || !this.form.productId || this.form.quantity <= 0) {
+                alert('Please fill in all required fields.')
                 return
             }
 
-            // Ensure date is stored consistently (as string or Date depending on your preference)
-            // If the store expects a string:
-            let dateToSave = this.form.date
-            if (dateToSave instanceof Date) {
-                dateToSave = dateToSave.toISOString().split('T')[0]
-            }
-
-            const dataToSave = {
-                ...this.form,
-                date: dateToSave,
+            // Convert Date object to string if necessary for consistency
+            if (this.form.date instanceof Date) {
+                this.form.date = this.formatDate(this.form.date)
             }
 
             if (this.isEditing) {
-                await this.updateOrder(this.editingId, dataToSave)
+                await this.updateStockIn(this.editingId, this.form)
             } else {
-                await this.addOrder(dataToSave)
+                await this.addStockIn(this.form)
             }
             this.closeModal()
         },
     },
     mounted() {
-        this.fetchOrders()
-        this.fetchCustomers()
+        this.fetchStockInRecords()
         this.fetchProducts()
     },
 }
 </script>
 
 <style scoped>
-.table td,
-.table th {
-    vertical-align: middle;
-}
 .modal-card,
 .modal-card-body {
     overflow: visible !important;

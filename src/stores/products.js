@@ -8,6 +8,23 @@ export const useProductStore = defineStore('products', {
         loading: false,
     }),
 
+    getters: {
+        sortedProducts: (state) => {
+            return [...state.products].sort((a, b) => {
+                const nameA = a.name || ''
+                const nameB = b.name || ''
+                return nameA.localeCompare(nameB, 'th')
+            })
+        },
+        sortedProductsByCode: (state) => {
+            return [...state.products].sort((a, b) => {
+                const codeA = a.code || ''
+                const codeB = b.code || ''
+                return codeA.localeCompare(codeB, 'th')
+            })
+        },
+    },
+
     actions: {
         async fetchProducts() {
             this.loading = true

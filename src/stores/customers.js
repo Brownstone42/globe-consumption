@@ -8,6 +8,23 @@ export const useCustomerStore = defineStore('customers', {
         loading: false,
     }),
 
+    getters: {
+        sortedCustomers: (state) => {
+            return [...state.customers].sort((a, b) => {
+                const nameA = a.name || ''
+                const nameB = b.name || ''
+                return nameA.localeCompare(nameB, 'th')
+            })
+        },
+        sortedCustomersByCode: (state) => {
+            return [...state.customers].sort((a, b) => {
+                const codeA = a.code || ''
+                const codeB = b.code || ''
+                return codeA.localeCompare(codeB, 'th')
+            })
+        },
+    },
+
     actions: {
         // ดึงข้อมูลลูกค้าทั้งหมด
         async fetchCustomers() {

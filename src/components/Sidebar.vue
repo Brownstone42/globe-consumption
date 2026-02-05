@@ -7,19 +7,46 @@
             </li>
         </ul>
 
-        <!-- เพิ่มส่วนนี้ -->
+        <!-- New Report Menu -->
+        <p class="menu-label">Report</p>
+        <ul class="menu-list">
+            <li>
+                <router-link to="/report/summary" active-class="is-active"
+                    >Sales Summary</router-link
+                >
+            </li>
+            <li>
+                <router-link to="/report/sales" active-class="is-active"
+                    >Customer Sales</router-link
+                >
+            </li>
+        </ul>
+
+        <p class="menu-label">History</p>
+        <ul class="menu-list">
+            <li>
+                <router-link to="/history/sales" active-class="is-active"
+                    >Sales History</router-link
+                >
+            </li>
+        </ul>
+
         <p class="menu-label">Stock</p>
         <ul class="menu-list">
             <li>
                 <router-link to="/stock/update" active-class="is-active">Update Stock</router-link>
             </li>
         </ul>
-        <!-- จบส่วนที่เพิ่ม -->
 
         <p class="menu-label">Purchase Order</p>
         <ul class="menu-list">
             <li>
-                <router-link to="/po/add" active-class="is-active">Add PO</router-link>
+                <router-link to="/po/add" active-class="is-active">Add PO (Sales)</router-link>
+            </li>
+            <li>
+                <router-link to="/po/stock-in" active-class="is-active"
+                    >Stock In (Purchase)</router-link
+                >
             </li>
         </ul>
 

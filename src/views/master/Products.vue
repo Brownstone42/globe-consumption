@@ -3,35 +3,63 @@
         <!-- Header & Actions -->
         <div class="level mb-4">
             <div class="level-left">
-                <div>
-                    <h1 class="title is-4">Products Management</h1>
-                    <!-- Filter Area -->
-                    <div class="field is-horizontal mt-2">
-                        <div class="field-label is-normal">
-                            <label class="label">Filter:</label>
-                        </div>
-                        <div class="field-body">
-                            <div class="field">
-                                <div class="control">
-                                    <div class="select">
-                                        <select v-model="filterCategoryId">
-                                            <option value="">All Categories</option>
-                                            <option
-                                                v-for="cat in categories"
-                                                :key="cat.id"
-                                                :value="cat.id"
-                                            >
-                                                {{ cat.name }}
-                                            </option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
+                <h1 class="title is-4">Products Management</h1>
+            </div>
+            <div class="level-right">
+                <!-- Search Filter -->
+                <div class="field mr-4 mb-0">
+                    <div class="control has-icons-left">
+                        <input
+                            class="input"
+                            type="text"
+                            v-model="searchQuery"
+                            placeholder="Search product name..."
+                            @input="currentPage = 1"
+                        />
+                        <span class="icon is-small is-left">
+                            <i class="fas fa-search"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Category Dropdown Filter -->
+                <div class="field mr-4 mb-0">
+                    <div class="control">
+                        <div class="select">
+                            <select v-model="filterCategoryId" @change="currentPage = 1">
+                                <option value="">All Categories</option>
+                                <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                                    {{ cat.name }}
+                                </option>
+                            </select>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="level-right">
+
+                <!-- Pagination Controls -->
+                <div class="field has-addons mr-4 mb-0" v-if="totalPages > 1">
+                    <p class="control">
+                        <button class="button" @click="currentPage--" :disabled="currentPage === 1">
+                            <span class="icon"><i class="fas fa-chevron-left"></i></span>
+                        </button>
+                    </p>
+                    <p class="control">
+                        <button class="button is-static">
+                            {{ currentPage }} / {{ totalPages }}
+                        </button>
+                    </p>
+                    <p class="control">
+                        <button
+                            class="button"
+                            @click="currentPage++"
+                            :disabled="currentPage === totalPages"
+                        >
+                            <span class="icon"><i class="fas fa-chevron-right"></i></span>
+                        </button>
+                    </p>
+                </div>
+
+                <!-- Add Button -->
                 <button class="button is-primary" @click="openModal()">
                     <span class="icon"><i class="fas fa-plus"></i></span>
                     <span>Add Product</span>
@@ -42,38 +70,43 @@
         <!-- Table -->
         <div class="box">
             <div class="table-container">
-                <table class="table is-fullwidth is-striped is-hoverable">
+                <table class="table is-fullwidth is-striped is-hoverable is-fixed-layout">
                     <thead>
                         <tr>
-                            <!-- Clickable Header for Sorting -->
-                            <th class="is-clickable" @click="toggleSort('code')">
+                            <th class="is-clickable col-code" @click="toggleSort('code')">
                                 Code
-                                <span class="icon is-small ml-1" v-if="sortKey === 'code'">
+                                <span class="icon is-small ml-1">
                                     <i
-                                        class="fas"
-                                        :class="sortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down'"
+                                        v-if="sortKey !== 'code'"
+                                        class="fas fa-sort has-text-grey-light"
+                                    ></i>
+                                    <i
+                                        v-else
+                                        :class="[
+                                            'fas',
+                                            sortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                                        ]"
                                     ></i>
                                 </span>
-                                <span class="icon is-small ml-1 has-text-grey-light" v-else>
-                                    <i class="fas fa-sort"></i>
-                                </span>
                             </th>
-
-                            <th class="is-clickable" @click="toggleSort('name')">
+                            <th class="is-clickable col-name" @click="toggleSort('name')">
                                 Product Name
-                                <span class="icon is-small ml-1" v-if="sortKey === 'name'">
+                                <span class="icon is-small ml-1">
                                     <i
-                                        class="fas"
-                                        :class="sortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down'"
+                                        v-if="sortKey !== 'name'"
+                                        class="fas fa-sort has-text-grey-light"
+                                    ></i>
+                                    <i
+                                        v-else
+                                        :class="[
+                                            'fas',
+                                            sortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                                        ]"
                                     ></i>
                                 </span>
-                                <span class="icon is-small ml-1 has-text-grey-light" v-else>
-                                    <i class="fas fa-sort"></i>
-                                </span>
                             </th>
-
-                            <th>Category</th>
-                            <th class="has-text-centered" style="width: 120px">Actions</th>
+                            <th class="col-category">Category</th>
+                            <th class="has-text-centered col-actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -85,12 +118,11 @@
                                 <p>Loading...</p>
                             </td>
                         </tr>
-                        <!-- Use computed property 'filteredProducts' instead of raw 'products' -->
-                        <tr v-else v-for="product in filteredProducts" :key="product.id">
-                            <td>
+                        <tr v-else v-for="product in paginatedProducts" :key="product.id">
+                            <td class="has-text-overflow">
                                 <strong>{{ product.code }}</strong>
                             </td>
-                            <td>{{ product.name }}</td>
+                            <td class="has-text-overflow">{{ product.name }}</td>
                             <td>
                                 <span class="tag is-info is-light">
                                     {{ getCategoryName(product.categoryId) }}
@@ -122,6 +154,11 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <!-- Show total counts -->
+            <div class="is-size-7 has-text-grey mt-2" v-if="!loading">
+                Showing {{ paginatedProducts.length }} of {{ filteredProducts.length }} products
+                (Sorted by {{ sortKey }} {{ sortOrder }})
             </div>
         </div>
 
@@ -204,10 +241,13 @@ export default {
             isEditing: false,
             editingId: null,
 
-            // Filter & Sort State
+            // Filter & Sort & Pagination State
+            searchQuery: '',
             filterCategoryId: '',
-            sortKey: 'code', // 'code' or 'name'
-            sortOrder: 'asc', // 'asc' or 'desc'
+            sortKey: 'name',
+            sortOrder: 'asc',
+            currentPage: 1,
+            itemsPerPage: 10,
 
             form: {
                 code: '',
@@ -220,26 +260,45 @@ export default {
         ...mapState(useProductStore, ['products', 'loading']),
         ...mapState(useCategoryStore, ['categories']),
 
-        // Logic สำหรับ Filter และ Sort
         filteredProducts() {
             let result = [...this.products]
 
-            // 1. Filter by Category
+            // 1. Filter by Search
+            if (this.searchQuery) {
+                const query = this.searchQuery.toLowerCase()
+                result = result.filter(
+                    (p) =>
+                        (p.name && p.name.toLowerCase().includes(query)) ||
+                        (p.code && p.code.toLowerCase().includes(query)),
+                )
+            }
+
+            // 2. Filter by Category
             if (this.filterCategoryId) {
                 result = result.filter((p) => p.categoryId === this.filterCategoryId)
             }
 
-            // 2. Sort by Key
+            // 3. Sort
             result.sort((a, b) => {
-                let fieldA = (a[this.sortKey] || '').toString().toLowerCase()
-                let fieldB = (b[this.sortKey] || '').toString().toLowerCase()
+                let valA = (a[this.sortKey] || '').toString().toLowerCase()
+                let valB = (b[this.sortKey] || '').toString().toLowerCase()
 
-                if (fieldA < fieldB) return this.sortOrder === 'asc' ? -1 : 1
-                if (fieldA > fieldB) return this.sortOrder === 'asc' ? 1 : -1
+                if (valA < valB) return this.sortOrder === 'asc' ? -1 : 1
+                if (valA > valB) return this.sortOrder === 'asc' ? 1 : -1
                 return 0
             })
 
             return result
+        },
+
+        totalPages() {
+            return Math.ceil(this.filteredProducts.length / this.itemsPerPage) || 1
+        },
+
+        paginatedProducts() {
+            const start = (this.currentPage - 1) * this.itemsPerPage
+            const end = start + this.itemsPerPage
+            return this.filteredProducts.slice(start, end)
         },
     },
     methods: {
@@ -256,16 +315,14 @@ export default {
             return cat ? cat.name : '-'
         },
 
-        // ฟังก์ชันสลับการเรียงลำดับ
         toggleSort(key) {
             if (this.sortKey === key) {
-                // ถ้ากดซ้ำคอลัมน์เดิม ให้สลับ asc/desc
                 this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc'
             } else {
-                // ถ้ากดคอลัมน์ใหม่ ให้เริ่มที่ asc
                 this.sortKey = key
                 this.sortOrder = 'asc'
             }
+            this.currentPage = 1
         },
 
         openModal(product = null) {
@@ -316,12 +373,53 @@ export default {
 .table th {
     vertical-align: middle;
 }
+
+.is-fixed-layout {
+    table-layout: fixed;
+}
+
+.col-code {
+    width: 200px;
+}
+
+.col-name {
+    width: auto;
+}
+
+.col-category {
+    width: 180px;
+}
+
+.col-actions {
+    width: 120px;
+}
+
+.has-text-overflow {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .is-clickable {
     cursor: pointer;
-    user-select: none; /* ป้องกันการ highlight text เวลาคลิกรัวๆ */
+    user-select: none;
 }
+
 .is-clickable:hover {
     background-color: #f5f5f5;
-    color: #3273dc; /* Bulma link color */
+}
+
+@media screen and (max-width: 768px) {
+    .level-right {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .level-right .field {
+        margin-right: 0 !important;
+        margin-bottom: 0.75rem !important;
+    }
+    .is-fixed-layout {
+        table-layout: auto;
+    }
 }
 </style>

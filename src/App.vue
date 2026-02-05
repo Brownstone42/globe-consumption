@@ -22,7 +22,7 @@
             </div>
 
             <!-- Main Content Column -->
-            <div class="column" style="background-color: #fff; min-height: 100vh">
+            <div class="column" style="background-color: #fff; min-height: 100vh; min-width: 0">
                 <div class="section">
                     <router-view></router-view>
                 </div>

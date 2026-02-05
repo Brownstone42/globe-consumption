@@ -1,31 +1,37 @@
 import { defineStore } from 'pinia'
 import { db } from '../firebase'
-import { collection, getDocs, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
+import {
+    collection,
+    getDocs,
+    addDoc,
+    updateDoc,
+    doc,
+    serverTimestamp,
+    query,
+    where,
+    orderBy,
+} from 'firebase/firestore'
 
 export const useStockStore = defineStore('stock', {
     state: () => ({
         loading: false,
-        lastUpdates: {}, // State ใหม่: { productId: { quantity, countDate } }
+        lastUpdates: {}, // State: { productId: { quantity, countDate } }
     }),
 
     actions: {
-        // Action ใหม่: ดึงข้อมูลการนับครั้งล่าสุดของทุกสินค้า
         async fetchLastStockUpdates() {
             this.loading = true
             try {
-                // ดึงข้อมูลทั้งหมดโดยเรียงจากวันที่นับล่าสุดไปเก่าสุด
-                const q = query(collection(db, 'con-stock-updates'), orderBy('countDate', 'desc'))
+                // Since we now maintain only one record per product, we can just fetch all
+                const q = query(collection(db, 'con-stock-updates'))
                 const querySnapshot = await getDocs(q)
 
                 const latestUpdates = {}
                 querySnapshot.forEach((doc) => {
                     const data = doc.data()
-                    // ถ้ายังไม่เคยบันทึกข้อมูลของ productId นี้ แปลว่าอันนี้คือล่าสุด
-                    if (!latestUpdates[data.productId]) {
-                        latestUpdates[data.productId] = {
-                            quantity: data.quantity,
-                            countDate: data.countDate,
-                        }
+                    latestUpdates[data.productId] = {
+                        quantity: data.quantity,
+                        countDate: data.countDate,
                     }
                 })
                 this.lastUpdates = latestUpdates
@@ -36,42 +42,45 @@ export const useStockStore = defineStore('stock', {
             }
         },
 
-        // แก้ไข Action เดิม
         async recordStockUpdate(countDate, updates) {
             this.loading = true
             try {
-                const batch = []
+                const stockUpdatesRef = collection(db, 'con-stock-updates')
+
+                // Process each product update
                 for (const productId in updates) {
-                    if (Object.hasOwnProperty.call(updates, productId)) {
-                        const quantity = updates[productId]
-                        // เพิ่มการตรวจสอบว่าเป็นตัวเลขและไม่ว่างเปล่า
-                        if (quantity !== null && quantity !== '' && !isNaN(quantity)) {
-                            batch.push(
-                                addDoc(collection(db, 'con-stock-updates'), {
-                                    productId: productId,
-                                    quantity: Number(quantity),
-                                    countDate: countDate,
-                                    createdAt: serverTimestamp(),
-                                }),
-                            )
+                    const quantity = updates[productId]
+                    if (quantity !== null && quantity !== '' && !isNaN(quantity)) {
+                        // 1. Check if a record for this productId exists (regardless of countDate)
+                        const q = query(stockUpdatesRef, where('productId', '==', productId))
+                        const existingSnap = await getDocs(q)
+
+                        if (!existingSnap.empty) {
+                            // 2. If exists, update that specific product record
+                            const docRef = doc(db, 'con-stock-updates', existingSnap.docs[0].id)
+                            await updateDoc(docRef, {
+                                quantity: Number(quantity),
+                                countDate: countDate, // Update to the new count date
+                                updatedAt: serverTimestamp(),
+                            })
+                        } else {
+                            // 3. If not exists, create the first record for this product
+                            await addDoc(stockUpdatesRef, {
+                                productId: productId,
+                                quantity: Number(quantity),
+                                countDate: countDate,
+                                createdAt: serverTimestamp(),
+                                updatedAt: serverTimestamp(),
+                            })
                         }
                     }
                 }
 
-                if (batch.length === 0) {
-                    alert('No valid quantities entered.')
-                    return
-                }
-
-                await Promise.all(batch)
-
-                alert('Stock updated successfully!')
-
-                // เรียก Action ใหม่เพื่อรีเฟรชข้อมูลล่าสุด
+                alert('Stock updated successfully! (1 record per product maintained)')
                 await this.fetchLastStockUpdates()
             } catch (error) {
                 console.error('Error recording stock update:', error)
-                alert('Failed to update stock.')
+                alert('Failed to update stock: ' + error.message)
             } finally {
                 this.loading = false
             }
