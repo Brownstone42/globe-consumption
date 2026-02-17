@@ -41,7 +41,10 @@
         <p class="menu-label">Purchase Order</p>
         <ul class="menu-list">
             <li>
-                <router-link to="/po/add" active-class="is-active">Add PO (Sales)</router-link>
+                <router-link to="/po/add" active-class="is-active">View PO (Sales)</router-link>
+            </li>
+            <li>
+                <router-link to="/po/import" active-class="is-active">Import PO (Excel)</router-link>
             </li>
             <li>
                 <router-link to="/po/stock-in" active-class="is-active"

@@ -3,6 +3,7 @@ import Customers from '../views/master/Customers.vue'
 import Categories from '../views/master/Categories.vue'
 import Products from '../views/master/Products.vue'
 import AddPO from '../views/po/AddPO.vue'
+import ImportPO from '../views/po/ImportPO.vue'
 import AddStockIn from '../views/po/AddStockIn.vue'
 import UpdateStock from '../views/stock/UpdateStock.vue'
 import MonthlyHistory from '../views/history/MonthlyHistory.vue'
@@ -21,6 +22,7 @@ const router = createRouter({
         { path: '/categories', name: 'categories', component: Categories },
         { path: '/products', name: 'products', component: Products },
         { path: '/po/add', name: 'add-po', component: AddPO },
+        { path: '/po/import', name: 'import-po', component: ImportPO },
         { path: '/po/stock-in', name: 'stock-in', component: AddStockIn },
         { path: '/stock/update', name: 'update-stock', component: UpdateStock },
         { path: '/history/sales', name: 'sales-history', component: MonthlyHistory },
