@@ -82,14 +82,14 @@
                                 class="has-text-right sticky-stock"
                                 :class="getStockColor(item.stock)"
                             >
-                                {{ item.stock }}
+                                {{ formatNumber(item.stock) }}
                             </td>
                             <td
                                 v-for="month in reportStore.monthHeaders"
                                 :key="month"
                                 class="has-text-right"
                             >
-                                {{ item.sales[month] || 0 }}
+                                {{ formatNumber(item.sales[month] || 0) }}
                             </td>
                         </tr>
                     </tbody>
@@ -137,6 +137,10 @@ export default {
             const [year, month] = monthStr.split('-')
             const date = new Date(year, month - 1)
             return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+        },
+        formatNumber(val) {
+            if (val === undefined || val === null) return '0'
+            return val.toLocaleString()
         },
         getStockColor(stock) {
             if (typeof stock !== 'number') return ''

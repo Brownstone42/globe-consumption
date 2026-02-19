@@ -7,6 +7,14 @@
             </li>
         </ul>
 
+        <!-- New Info Menu -->
+        <p class="menu-label">Info</p>
+        <ul class="menu-list">
+            <li>
+                <router-link to="/info/lt-moq" active-class="is-active">LT & MOQ</router-link>
+            </li>
+        </ul>
+
         <!-- New Report Menu -->
         <p class="menu-label">Report</p>
         <ul class="menu-list">

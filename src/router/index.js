@@ -9,6 +9,7 @@ import UpdateStock from '../views/stock/UpdateStock.vue'
 import MonthlyHistory from '../views/history/MonthlyHistory.vue'
 import SalesReport from '../views/report/SalesReport.vue'
 import SalesSummary from '../views/report/SalesSummary.vue'
+import LtMoq from '../views/info/LtMoq.vue'
 
 const Dashboard = {
     template: '<h1 class="title">Dashboard Overview</h1><p>Welcome to Stock Management System.</p>',
@@ -26,6 +27,7 @@ const router = createRouter({
         { path: '/po/stock-in', name: 'stock-in', component: AddStockIn },
         { path: '/stock/update', name: 'update-stock', component: UpdateStock },
         { path: '/history/sales', name: 'sales-history', component: MonthlyHistory },
+        { path: '/info/lt-moq', name: 'lt-moq', component: LtMoq },
 
         // New Report Routes
         {

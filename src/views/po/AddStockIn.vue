@@ -45,7 +45,7 @@
                             <td>{{ record.reference || '-' }}</td>
                             <td>{{ getProductName(record.productId) }}</td>
                             <td class="has-text-weight-bold has-text-success">
-                                +{{ record.quantity }}
+                                +{{ formatNumber(record.quantity) }}
                             </td>
                             <td class="has-text-centered">
                                 <div class="buttons is-centered are-small">
@@ -57,7 +57,7 @@
                                     </button>
                                     <button
                                         class="button is-danger is-light"
-                                        @click="deleteStockIn(record.id)"
+                                        @click="deleteRecord(record.id)"
                                     >
                                         <span class="icon"><i class="fas fa-trash"></i></span>
                                     </button>
@@ -124,7 +124,7 @@
                                         <select v-model="form.productId">
                                             <option value="" disabled>Select Code</option>
                                             <option
-                                                v-for="prod in products"
+                                                v-for="prod in sortedByCode"
                                                 :key="prod.id"
                                                 :value="prod.id"
                                             >
@@ -145,7 +145,7 @@
                                         <select v-model="form.productId">
                                             <option value="" disabled>Select Name</option>
                                             <option
-                                                v-for="prod in products"
+                                                v-for="prod in sortedByName"
                                                 :key="prod.id"
                                                 :value="prod.id"
                                             >
@@ -190,6 +190,7 @@
 import { mapState, mapActions } from 'pinia'
 import { useStockInStore } from '../../stores/stockIn'
 import { useProductStore } from '../../stores/products'
+import Jarvis from '../../utils/jarvis'
 
 export default {
     name: 'AddStockIn',
@@ -209,6 +210,17 @@ export default {
     computed: {
         ...mapState(useStockInStore, ['stockInRecords', 'loading']),
         ...mapState(useProductStore, ['products']),
+        
+        sortedByCode() {
+            return [...this.products].sort((a, b) => 
+                String(a.code).localeCompare(String(b.code))
+            )
+        },
+        sortedByName() {
+            return [...this.products].sort((a, b) => 
+                String(a.name).localeCompare(String(b.name))
+            )
+        }
     },
     methods: {
         ...mapActions(useStockInStore, [
@@ -230,6 +242,10 @@ export default {
                 return dateStr.toISOString().split('T')[0]
             }
             return ''
+        },
+        formatNumber(val) {
+            if (val === undefined || val === null) return '0'
+            return val.toLocaleString()
         },
         getTodayString() {
             const d = new Date()
@@ -258,9 +274,15 @@ export default {
         closeModal() {
             this.isModalActive = false
         },
+        async deleteRecord(id) {
+            if (await Jarvis.confirm('Are you sure you want to delete this record?')) {
+                await this.deleteStockIn(id)
+                Jarvis.toast('Deleted successfully')
+            }
+        },
         async submitForm() {
             if (!this.form.date || !this.form.productId || this.form.quantity <= 0) {
-                alert('Please fill in all required fields.')
+                Jarvis.alert('Please fill in all required fields.')
                 return
             }
 
@@ -269,12 +291,17 @@ export default {
                 this.form.date = this.formatDate(this.form.date)
             }
 
-            if (this.isEditing) {
-                await this.updateStockIn(this.editingId, this.form)
-            } else {
-                await this.addStockIn(this.form)
+            try {
+                if (this.isEditing) {
+                    await this.updateStockIn(this.editingId, this.form)
+                } else {
+                    await this.addStockIn(this.form)
+                }
+                this.closeModal()
+                Jarvis.toast('Saved successfully')
+            } catch (error) {
+                Jarvis.error(error.message)
             }
-            this.closeModal()
         },
     },
     mounted() {

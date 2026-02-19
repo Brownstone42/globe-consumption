@@ -132,6 +132,7 @@ import { useCustomerStore } from '../../stores/customers'
 import { useProductStore } from '../../stores/products'
 import { db } from '../../firebase'
 import { collection, writeBatch, doc, serverTimestamp } from 'firebase/firestore'
+import Jarvis from '../../utils/jarvis'
 
 export default {
     name: 'ImportPO',
@@ -212,7 +213,7 @@ export default {
                     this.fileProcessed = true
                 } catch (error) {
                     console.error('Error processing Excel file:', error)
-                    alert('Error reading Excel file: ' + error.message)
+                    Jarvis.error('Error reading Excel file: ' + error.message)
                 }
             }
             reader.readAsArrayBuffer(file)
@@ -325,7 +326,7 @@ export default {
 
         async saveImportedData() {
             if (this.validItemsCount === 0) {
-                alert('No valid items to process.')
+                Jarvis.alert('No valid items to process.')
                 return
             }
 
@@ -337,7 +338,7 @@ export default {
                 ? `Found ${duplicates} existing items. These will be updated with new data. Continue?`
                 : `Save ${this.validItemsCount} new items to database?`
 
-            if (!confirm(message)) return
+            if (!await Jarvis.confirm(message)) return
 
             try {
                 const batch = writeBatch(db)
@@ -378,12 +379,12 @@ export default {
                 })
 
                 await batch.commit()
-                alert(`Successfully processed ${this.validItemsCount} items!`)
+                Jarvis.success(`Successfully processed ${this.validItemsCount} items!`)
                 this.clearPreview()
                 await this.fetchOrders()
             } catch (error) {
                 console.error('Error processing data:', error)
-                alert('Error: ' + error.message)
+                Jarvis.error('Error: ' + error.message)
             }
         }
     },
