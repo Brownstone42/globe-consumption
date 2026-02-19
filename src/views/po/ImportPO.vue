@@ -356,16 +356,22 @@ export default {
                                     docRef = doc(poCollection)
                                 }
 
-                                batch.set(docRef, {
+                                const dataToSave = {
                                     orderId: po.poNumber,
                                     date: po.poDate,
                                     customerId: po.customer.id,
                                     productId: item.productId,
                                     quantity: item.quantity,
                                     order: item.order,
-                                    updatedAt: serverTimestamp(),
-                                    createdAt: item.isDuplicate ? undefined : serverTimestamp()
-                                }, { merge: true })
+                                    updatedAt: serverTimestamp()
+                                }
+
+                                // Only set createdAt for new items to avoid "undefined" error in batch.set
+                                if (!item.isDuplicate) {
+                                    dataToSave.createdAt = serverTimestamp()
+                                }
+
+                                batch.set(docRef, dataToSave, { merge: true })
                             }
                         })
                     }
