@@ -19,6 +19,7 @@
                         <tr>
                             <th>Category</th>
                             <th>Supplier</th>
+                            <th>Country</th>
                             <th class="has-text-centered">Lead Time</th>
                             <th class="has-text-centered">MOQ</th>
                             <th class="has-text-right">Actions</th>
@@ -27,7 +28,8 @@
                     <tbody>
                         <tr v-for="item in moqList" :key="item.id">
                             <td>{{ getCategoryName(item.categoryId) }}</td>
-                            <td>{{ item.supplier }}</td>
+                            <td>{{ getSupplierName(item.supplierId) }}</td>
+                            <td>{{ getSupplierCountry(item.supplierId) }}</td>
                             <td class="has-text-centered">{{ item.leadTime }}</td>
                             <td class="has-text-centered">{{ item.moq }}</td>
                             <td class="has-text-right">
@@ -40,10 +42,10 @@
                             </td>
                         </tr>
                         <tr v-if="moqList.length === 0 && !loading">
-                            <td colspan="5" class="has-text-centered has-text-grey py-5">No data found</td>
+                            <td colspan="6" class="has-text-centered has-text-grey py-5">No data found</td>
                         </tr>
                         <tr v-if="loading">
-                            <td colspan="5" class="has-text-centered py-5">
+                            <td colspan="6" class="has-text-centered py-5">
                                 <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Loading...
                             </td>
                         </tr>
@@ -75,9 +77,16 @@
                         </div>
                     </div>
                     <div class="field">
-                        <label class="label">Supplier Name</label>
+                        <label class="label">Supplier</label>
                         <div class="control">
-                            <input class="input" type="text" v-model="form.supplier" placeholder="Supplier name" required>
+                            <div class="select is-fullwidth">
+                                <select v-model="form.supplierId" required>
+                                    <option value="" disabled>Select Supplier</option>
+                                    <option v-for="sup in suppliers" :key="sup.id" :value="sup.id">
+                                        {{ sup.name }} ({{ sup.country }})
+                                    </option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="columns">
@@ -112,6 +121,7 @@
 import { mapState, mapActions } from 'pinia'
 import { useMoqStore } from '../../stores/moq'
 import { useCategoryStore } from '../../stores/categories'
+import { useSupplierStore } from '../../stores/suppliers'
 import Jarvis from '../../utils/jarvis'
 
 export default {
@@ -124,7 +134,7 @@ export default {
             form: {
                 id: null,
                 categoryId: '',
-                supplier: '',
+                supplierId: '',
                 leadTime: '',
                 moq: ''
             }
@@ -132,27 +142,45 @@ export default {
     },
     computed: {
         ...mapState(useMoqStore, ['moqList', 'loading']),
-        ...mapState(useCategoryStore, ['categories'])
+        ...mapState(useCategoryStore, ['categories']),
+        ...mapState(useSupplierStore, ['suppliers'])
     },
     methods: {
         ...mapActions(useMoqStore, ['fetchMoqList', 'addMoq', 'updateMoq', 'deleteMoq']),
         ...mapActions(useCategoryStore, ['fetchCategories']),
+        ...mapActions(useSupplierStore, ['fetchSuppliers']),
 
         getCategoryName(id) {
             const cat = this.categories.find(c => c.id === id)
             return cat ? cat.name : 'Unknown'
         },
 
+        getSupplierName(id) {
+            const sup = this.suppliers.find(s => s.id === id)
+            return sup ? sup.name : 'Unknown'
+        },
+
+        getSupplierCountry(id) {
+            const sup = this.suppliers.find(s => s.id === id)
+            return sup ? sup.country : '-'
+        },
+
         openModal(item = null) {
             if (item) {
                 this.isEditing = true
-                this.form = { ...item }
+                this.form = { 
+                    id: item.id,
+                    categoryId: item.categoryId,
+                    supplierId: item.supplierId || '',
+                    leadTime: item.leadTime,
+                    moq: item.moq
+                }
             } else {
                 this.isEditing = false
                 this.form = {
                     id: null,
                     categoryId: '',
-                    supplier: '',
+                    supplierId: '',
                     leadTime: '',
                     moq: ''
                 }
@@ -165,7 +193,7 @@ export default {
         },
 
         async saveMoq() {
-            if (!this.form.categoryId || !this.form.supplier) {
+            if (!this.form.categoryId || !this.form.supplierId) {
                 Jarvis.alert('Please fill in all required fields')
                 return
             }
@@ -200,8 +228,11 @@ export default {
         }
     },
     async mounted() {
-        if (this.moqList.length === 0) await this.fetchMoqList()
-        if (this.categories.length === 0) await this.fetchCategories()
+        await Promise.all([
+            this.fetchMoqList(),
+            this.fetchCategories(),
+            this.fetchSuppliers()
+        ])
     }
 }
 </script>

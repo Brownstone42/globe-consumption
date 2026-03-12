@@ -147,7 +147,7 @@
                                 {{ getCustomerName(item.customerId) }}
                             </td>
                             <td class="has-text-overflow">{{ getProductName(item.productId) }}</td>
-                            <td class="has-text-right">{{ item.quantity }}</td>
+                            <td class="has-text-right">{{ formatNumber(item.quantity) }}</td>
                             <td>
                                 <span
                                     class="tag"
@@ -355,15 +355,35 @@
                         </p>
                     </div>
 
-                    <div class="field">
-                        <label class="label">Select Month to Sync</label>
-                        <div class="control">
-                            <input
-                                class="input"
-                                type="month"
-                                v-model="syncMonth"
-                                :disabled="syncStep === 'preview'"
-                            />
+                    <div class="columns">
+                        <div class="column">
+                            <div class="field">
+                                <label class="label">Select Month to Sync</label>
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        type="month"
+                                        v-model="syncMonth"
+                                        :disabled="syncStep === 'preview'"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column">
+                            <div class="field">
+                                <label class="label">Select Product (Optional)</label>
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select v-model="syncProductId" :disabled="syncStep === 'preview'">
+                                            <option value="">All Products</option>
+                                            <option v-for="prod in sortedProducts" :key="prod.id" :value="prod.id">
+                                                {{ prod.name }}
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <p class="help">Leave as "All Products" to sync everything.</p>
+                            </div>
                         </div>
                     </div>
 
@@ -386,7 +406,7 @@
                             class="notification is-danger is-light"
                         >
                             <strong>Warning:</strong> Found {{ previewData.existingCount }} existing
-                            records for {{ syncMonth }}.
+                            records for {{ syncMonth }}{{ syncProductId ? ' for this product' : '' }}.
                             <br />
                             Syncing is disabled to prevent overwriting manual data. Please delete
                             existing records first if you wish to proceed.
@@ -423,7 +443,7 @@
                                     >
                                         <td>{{ getCustomerName(rec.customerId) }}</td>
                                         <td>{{ getProductName(rec.productId) }}</td>
-                                        <td class="has-text-right">{{ rec.quantity }}</td>
+                                        <td class="has-text-right">{{ formatNumber(rec.quantity) }}</td>
                                     </tr>
                                     <tr v-if="previewData.records.length > 5">
                                         <td colspan="3" class="has-text-centered has-text-grey">
@@ -492,6 +512,7 @@ export default {
             // Sync Logic
             isSyncModalActive: false,
             syncMonth: '',
+            syncProductId: '',
             syncStep: 'input', // 'input' | 'preview'
             previewData: {
                 poCount: 0,
@@ -581,6 +602,7 @@ export default {
 
         openSyncModal() {
             this.syncMonth = this.filterMonth || new Date().toISOString().slice(0, 7)
+            this.syncProductId = this.filterProductId || ''
             this.syncStep = 'input'
             this.previewData = { poCount: 0, records: [], existingCount: 0 }
             this.isSyncModalActive = true
@@ -593,7 +615,7 @@ export default {
             if (!this.syncMonth) return
             try {
                 const store = useHistoryStore()
-                const result = await store.syncFromPO(this.syncMonth, true)
+                const result = await store.syncFromPO(this.syncMonth, this.syncProductId, true)
                 this.previewData = result
                 this.syncStep = 'preview'
             } catch (error) {
@@ -605,7 +627,7 @@ export default {
             if (!this.syncMonth) return
             try {
                 const store = useHistoryStore()
-                await store.syncFromPO(this.syncMonth, false)
+                await store.syncFromPO(this.syncMonth, this.syncProductId, false)
                 this.closeSyncModal()
                 this.fetchHistories()
                 alert('Sync completed successfully!')
@@ -639,6 +661,11 @@ export default {
                 await this.addHistory(this.form)
             }
             this.closeModal()
+        },
+
+        formatNumber(val) {
+            if (val === undefined || val === null || val === '') return '0'
+            return Number(val).toLocaleString()
         },
     },
     mounted() {

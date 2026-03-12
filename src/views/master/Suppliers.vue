@@ -1,9 +1,9 @@
 <template>
     <div class="container is-fluid">
-        <!-- Header & Actions -->
+        <!-- Header -->
         <div class="level mb-4">
             <div class="level-left">
-                <h1 class="title is-4">Products Management</h1>
+                <h1 class="title is-4">Suppliers Management</h1>
             </div>
             <div class="level-right">
                 <!-- Search Filter -->
@@ -13,26 +13,12 @@
                             class="input"
                             type="text"
                             v-model="searchQuery"
-                            placeholder="Search product name..."
+                            placeholder="Search supplier name..."
                             @input="currentPage = 1"
                         />
                         <span class="icon is-small is-left">
                             <i class="fas fa-search"></i>
                         </span>
-                    </div>
-                </div>
-
-                <!-- Category Dropdown Filter -->
-                <div class="field mr-4 mb-0">
-                    <div class="control">
-                        <div class="select">
-                            <select v-model="filterCategoryId" @change="currentPage = 1">
-                                <option value="">All Categories</option>
-                                <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                                    {{ cat.name }}
-                                </option>
-                            </select>
-                        </div>
                     </div>
                 </div>
 
@@ -62,7 +48,7 @@
                 <!-- Add Button -->
                 <button class="button is-primary" @click="openModal()">
                     <span class="icon"><i class="fas fa-plus"></i></span>
-                    <span>Add Product</span>
+                    <span>Add Supplier</span>
                 </button>
             </div>
         </div>
@@ -73,24 +59,8 @@
                 <table class="table is-fullwidth is-striped is-hoverable is-fixed-layout">
                     <thead>
                         <tr>
-                            <th class="is-clickable col-code" @click="toggleSort('code')">
-                                Code
-                                <span class="icon is-small ml-1">
-                                    <i
-                                        v-if="sortKey !== 'code'"
-                                        class="fas fa-sort has-text-grey-light"
-                                    ></i>
-                                    <i
-                                        v-else
-                                        :class="[
-                                            'fas',
-                                            sortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
-                                        ]"
-                                    ></i>
-                                </span>
-                            </th>
                             <th class="is-clickable col-name" @click="toggleSort('name')">
-                                Product Name
+                                Supplier Name
                                 <span class="icon is-small ml-1">
                                     <i
                                         v-if="sortKey !== 'name'"
@@ -105,45 +75,49 @@
                                     ></i>
                                 </span>
                             </th>
-                            <th class="col-category">Category</th>
-                            <th class="col-supplier">Supplier</th>
+                            <th class="is-clickable col-country" @click="toggleSort('country')">
+                                Country
+                                <span class="icon is-small ml-1">
+                                    <i
+                                        v-if="sortKey !== 'country'"
+                                        class="fas fa-sort has-text-grey-light"
+                                    ></i>
+                                    <i
+                                        v-else
+                                        :class="[
+                                            'fas',
+                                            sortOrder === 'asc' ? 'fa-sort-up' : 'fa-sort-down',
+                                        ]"
+                                    ></i>
+                                </span>
+                            </th>
                             <th class="has-text-centered col-actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-if="loading">
-                            <td colspan="5" class="has-text-centered py-5">
+                            <td colspan="3" class="has-text-centered py-5">
                                 <span class="icon is-large"
                                     ><i class="fas fa-spinner fa-pulse fa-2x"></i
                                 ></span>
                                 <p>Loading...</p>
                             </td>
                         </tr>
-                        <tr v-else v-for="product in paginatedProducts" :key="product.id">
-                            <td class="has-text-overflow">
-                                <strong>{{ product.code }}</strong>
-                            </td>
-                            <td class="has-text-overflow">{{ product.name }}</td>
-                            <td>
-                                <span class="tag is-info is-light">
-                                    {{ getCategoryName(product.categoryId) }}
-                                </span>
-                            </td>
-                            <td>
-                                {{ getSupplierName(product.supplierId) }}
-                            </td>
+                        <tr v-else v-for="supplier in paginatedSuppliers" :key="supplier.id">
+                            <td class="has-text-overflow">{{ supplier.name }}</td>
+                            <td class="has-text-overflow">{{ supplier.country }}</td>
                             <td class="has-text-centered">
                                 <div class="buttons is-centered are-small">
                                     <button
                                         class="button is-info is-light"
-                                        @click="openModal(product)"
+                                        @click="openModal(supplier)"
                                         title="Edit"
                                     >
                                         <span class="icon"><i class="fas fa-edit"></i></span>
                                     </button>
                                     <button
                                         class="button is-danger is-light"
-                                        @click="deleteProduct(product.id)"
+                                        @click="deleteSupplier(supplier.id)"
                                         title="Delete"
                                     >
                                         <span class="icon"><i class="fas fa-trash"></i></span>
@@ -151,9 +125,9 @@
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="!loading && filteredProducts.length === 0">
-                            <td colspan="5" class="has-text-centered has-text-grey py-5">
-                                No products found matching your criteria.
+                        <tr v-if="!loading && filteredSuppliers.length === 0">
+                            <td colspan="3" class="has-text-centered has-text-grey py-5">
+                                No suppliers found matching your criteria.
                             </td>
                         </tr>
                     </tbody>
@@ -161,8 +135,8 @@
             </div>
             <!-- Show total counts -->
             <div class="is-size-7 has-text-grey mt-2" v-if="!loading">
-                Showing {{ paginatedProducts.length }} of {{ filteredProducts.length }} products
-                (Sorted by {{ sortKey }} {{ sortOrder }})
+                Showing {{ paginatedSuppliers.length }} of
+                {{ filteredSuppliers.length }} suppliers (Sorted by {{ sortKey }} {{ sortOrder }})
             </div>
         </div>
 
@@ -171,61 +145,36 @@
             <div class="modal-background" @click="closeModal"></div>
             <div class="modal-card">
                 <header class="modal-card-head">
-                    <p class="modal-card-title">{{ isEditing ? 'Edit Product' : 'Add Product' }}</p>
+                    <p class="modal-card-title">
+                        {{ isEditing ? 'Edit Supplier' : 'Add Supplier' }}
+                    </p>
                     <button class="delete" aria-label="close" @click="closeModal"></button>
                 </header>
                 <section class="modal-card-body">
                     <div class="field">
                         <label class="label"
-                            >Product Code <span class="has-text-danger">*</span></label
-                        >
-                        <div class="control">
-                            <input
-                                class="input"
-                                type="text"
-                                v-model="form.code"
-                                placeholder="e.g. PD-001"
-                            />
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label"
-                            >Product Name <span class="has-text-danger">*</span></label
+                            >Supplier Name <span class="has-text-danger">*</span></label
                         >
                         <div class="control">
                             <input
                                 class="input"
                                 type="text"
                                 v-model="form.name"
-                                placeholder="e.g. Wireless Mouse"
+                                placeholder="e.g. Acme Corp"
                             />
                         </div>
                     </div>
 
                     <div class="field">
-                        <label class="label">Category <span class="has-text-danger">*</span></label>
+                        <label class="label">Country <span class="has-text-danger">*</span></label>
                         <div class="control">
                             <div class="select is-fullwidth">
-                                <select v-model="form.categoryId">
-                                    <option value="" disabled>Select Category</option>
-                                    <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                                        {{ cat.name }}
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label">Supplier <span class="has-text-danger">*</span></label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select v-model="form.supplierId">
-                                    <option value="" disabled>Select Supplier</option>
-                                    <option v-for="sup in suppliers" :key="sup.id" :value="sup.id">
-                                        {{ sup.name }} ({{ sup.country }})
-                                    </option>
+                                <select v-model="form.country">
+                                    <option value="TH">TH</option>
+                                    <option value="MY">MY</option>
+                                    <option value="CN">CN</option>
+                                    <option value="KR">KR</option>
+                                    <option value="TW">TW</option>
                                 </select>
                             </div>
                         </div>
@@ -248,61 +197,44 @@
 
 <script>
 import { mapState, mapActions } from 'pinia'
-import { useProductStore } from '../../stores/products'
-import { useCategoryStore } from '../../stores/categories'
 import { useSupplierStore } from '../../stores/suppliers'
 
 export default {
-    name: 'ProductsView',
+    name: 'SuppliersView',
     data() {
         return {
             isModalActive: false,
             isEditing: false,
             editingId: null,
-
-            // Filter & Sort & Pagination State
             searchQuery: '',
-            filterCategoryId: '',
-            sortKey: 'name',
-            sortOrder: 'asc',
             currentPage: 1,
             itemsPerPage: 10,
-
+            sortKey: 'name',
+            sortOrder: 'asc',
             form: {
-                code: '',
                 name: '',
-                categoryId: '',
-                supplierId: '',
+                country: 'TH',
             },
         }
     },
     computed: {
-        ...mapState(useProductStore, ['products', 'loading']),
-        ...mapState(useCategoryStore, ['categories']),
-        ...mapState(useSupplierStore, ['suppliers']),
+        ...mapState(useSupplierStore, ['suppliers', 'loading']),
 
-        filteredProducts() {
-            let result = [...this.products]
+        filteredSuppliers() {
+            let result = [...this.suppliers]
 
-            // 1. Filter by Search
             if (this.searchQuery) {
                 const query = this.searchQuery.toLowerCase()
                 result = result.filter(
-                    (p) =>
-                        (p.name && p.name.toLowerCase().includes(query)) ||
-                        (p.code && p.code.toLowerCase().includes(query)),
+                    (s) =>
+                        (s.name && s.name.toLowerCase().includes(query)) ||
+                        (s.country && s.country.toLowerCase().includes(query)),
                 )
             }
 
-            // 2. Filter by Category
-            if (this.filterCategoryId) {
-                result = result.filter((p) => p.categoryId === this.filterCategoryId)
-            }
-
-            // 3. Sort
             result.sort((a, b) => {
-                let valA = (a[this.sortKey] || '').toString().toLowerCase()
-                let valB = (b[this.sortKey] || '').toString().toLowerCase()
+                const valA = (a[this.sortKey] || '').toString().toLowerCase()
+                const valB = (b[this.sortKey] || '').toString().toLowerCase()
 
                 if (valA < valB) return this.sortOrder === 'asc' ? -1 : 1
                 if (valA > valB) return this.sortOrder === 'asc' ? 1 : -1
@@ -313,34 +245,22 @@ export default {
         },
 
         totalPages() {
-            return Math.ceil(this.filteredProducts.length / this.itemsPerPage) || 1
+            return Math.ceil(this.filteredSuppliers.length / this.itemsPerPage) || 1
         },
 
-        paginatedProducts() {
+        paginatedSuppliers() {
             const start = (this.currentPage - 1) * this.itemsPerPage
             const end = start + this.itemsPerPage
-            return this.filteredProducts.slice(start, end)
+            return this.filteredSuppliers.slice(start, end)
         },
     },
     methods: {
-        ...mapActions(useProductStore, [
-            'fetchProducts',
-            'addProduct',
-            'updateProduct',
-            'deleteProduct',
+        ...mapActions(useSupplierStore, [
+            'fetchSuppliers',
+            'addSupplier',
+            'updateSupplier',
+            'deleteSupplier',
         ]),
-        ...mapActions(useCategoryStore, ['fetchCategories']),
-        ...mapActions(useSupplierStore, ['fetchSuppliers']),
-
-        getCategoryName(id) {
-            const cat = this.categories.find((c) => c.id === id)
-            return cat ? cat.name : '-'
-        },
-
-        getSupplierName(id) {
-            const sup = this.suppliers.find((s) => s.id === id)
-            return sup ? sup.name : '-'
-        },
 
         toggleSort(key) {
             if (this.sortKey === key) {
@@ -352,24 +272,20 @@ export default {
             this.currentPage = 1
         },
 
-        openModal(product = null) {
-            if (product) {
+        openModal(supplier = null) {
+            if (supplier) {
                 this.isEditing = true
-                this.editingId = product.id
+                this.editingId = supplier.id
                 this.form = { 
-                    code: product.code,
-                    name: product.name,
-                    categoryId: product.categoryId,
-                    supplierId: product.supplierId || '',
+                    name: supplier.name,
+                    country: supplier.country || 'TH'
                 }
             } else {
                 this.isEditing = false
                 this.editingId = null
                 this.form = {
-                    code: '',
                     name: '',
-                    categoryId: '',
-                    supplierId: '',
+                    country: 'TH',
                 }
             }
             this.isModalActive = true
@@ -377,26 +293,24 @@ export default {
 
         closeModal() {
             this.isModalActive = false
-            this.form = { code: '', name: '', categoryId: '', supplierId: '' }
+            this.form = { name: '', country: 'TH' }
         },
 
         async submitForm() {
-            if (!this.form.code || !this.form.name || !this.form.categoryId || !this.form.supplierId) {
-                alert('Please fill in Code, Name, Category and Supplier')
+            if (!this.form.name || !this.form.country) {
+                alert('Please fill in all required fields')
                 return
             }
 
             if (this.isEditing) {
-                await this.updateProduct(this.editingId, this.form)
+                await this.updateSupplier(this.editingId, this.form)
             } else {
-                await this.addProduct(this.form)
+                await this.addSupplier(this.form)
             }
             this.closeModal()
         },
     },
     mounted() {
-        this.fetchProducts()
-        this.fetchCategories()
         this.fetchSuppliers()
     },
 }
@@ -412,19 +326,11 @@ export default {
     table-layout: fixed;
 }
 
-.col-code {
-    width: 150px;
-}
-
 .col-name {
     width: auto;
 }
 
-.col-category {
-    width: 150px;
-}
-
-.col-supplier {
+.col-country {
     width: 150px;
 }
 

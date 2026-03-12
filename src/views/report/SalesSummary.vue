@@ -6,7 +6,7 @@
         <div class="box mb-5">
             <div class="columns is-multiline">
                 <!-- Category Filter -->
-                <div class="column is-one-third">
+                <div class="column is-one-quarter">
                     <div class="field">
                         <label class="label">Filter by Category</label>
                         <div class="control">
@@ -26,8 +26,29 @@
                     </div>
                 </div>
 
+                <!-- Supplier Filter -->
+                <div class="column is-one-quarter">
+                    <div class="field">
+                        <label class="label">Filter by Supplier</label>
+                        <div class="control">
+                            <div class="select is-fullwidth">
+                                <select v-model="filterSupplier">
+                                    <option value="all">All Suppliers</option>
+                                    <option
+                                        v-for="sup in supplierStore.suppliers"
+                                        :key="sup.id"
+                                        :value="sup.id"
+                                    >
+                                        {{ sup.name }} ({{ sup.country }})
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Product Filter (Search) -->
-                <div class="column is-one-third">
+                <div class="column is-half">
                     <div class="field">
                         <label class="label">Search Product</label>
                         <div class="control has-icons-left">
@@ -61,10 +82,11 @@
             </div>
 
             <div v-else class="table-container">
-                <table class="table is-bordered is-striped is-hoverable is-narrow">
+                <table class="table is-bordered is-striped is-hoverable is-narrow is-fullwidth">
                     <thead>
                         <tr class="has-background-light">
                             <th class="sticky-name">Product Name</th>
+                            <th class="sticky-supplier">Supplier</th>
                             <th class="has-text-centered sticky-stock">Stock</th>
                             <th
                                 v-for="month in reportStore.monthHeaders"
@@ -77,7 +99,10 @@
                     </thead>
                     <tbody>
                         <tr v-for="item in filteredData" :key="item.id">
-                            <td class="has-text-weight-semibold sticky-name">{{ item.name }}</td>
+                            <td class="has-text-weight-semibold sticky-name" :title="item.name">{{ item.name }}</td>
+                            <td class="sticky-supplier" :title="item.supplierName + (item.supplierCountry ? ' (' + item.supplierCountry + ')' : '')">
+                                {{ item.supplierName }} {{ item.supplierCountry ? '(' + item.supplierCountry + ')' : '' }}
+                            </td>
                             <td
                                 class="has-text-right sticky-stock"
                                 :class="getStockColor(item.stock)"
@@ -102,12 +127,14 @@
 <script>
 import { useSummaryReportStore } from '../../stores/summaryReport'
 import { useCategoryStore } from '../../stores/categories'
+import { useSupplierStore } from '../../stores/suppliers'
 
 export default {
     name: 'SalesSummary',
     data() {
         return {
             filterCategory: 'all',
+            filterSupplier: 'all',
             searchQuery: '',
         }
     },
@@ -118,17 +145,24 @@ export default {
         categoryStore() {
             return useCategoryStore()
         },
+        supplierStore() {
+            return useSupplierStore()
+        },
         filteredData() {
             return this.reportStore.summaryData.filter((item) => {
                 const matchesCategory =
                     this.filterCategory === 'all' ||
                     String(item.categoryId) === String(this.filterCategory)
+                
+                const matchesSupplier = 
+                    this.filterSupplier === 'all' ||
+                    String(item.supplierId) === String(this.filterSupplier)
 
                 const matchesSearch = item.name
                     .toLowerCase()
                     .includes(this.searchQuery.toLowerCase())
 
-                return matchesCategory && matchesSearch
+                return matchesCategory && matchesSupplier && matchesSearch
             })
         },
     },
@@ -150,16 +184,20 @@ export default {
         },
     },
     async mounted() {
-        await this.categoryStore.fetchCategories()
-        await this.reportStore.generateSummaryReport()
+        await Promise.all([
+            this.categoryStore.fetchCategories(),
+            this.supplierStore.fetchSuppliers(),
+            this.reportStore.generateSummaryReport()
+        ])
     },
 }
 </script>
 
 <style scoped>
 .table-container {
-    overflow-x: auto;
+    overflow: auto;
     max-height: 70vh;
+    padding-bottom: 8px;
 }
 
 .table th,
@@ -169,6 +207,7 @@ export default {
 
 /* Base sticky styling */
 .sticky-name,
+.sticky-supplier,
 .sticky-stock {
     position: sticky;
     z-index: 1;
@@ -178,22 +217,32 @@ export default {
 /* Product Name column - first column */
 .sticky-name {
     left: 0;
+    min-width: 350px;
+    max-width: 350px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Supplier column - second column */
+.sticky-supplier {
+    left: 350px; /* Offset by the width of sticky-name */
     min-width: 250px;
     max-width: 250px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-/* Stock column - second column */
+/* Stock column - third column */
 .sticky-stock {
-    left: 250px; /* Offset by the width of sticky-name */
+    left: 600px; /* Offset by width of sticky-name + sticky-supplier (350+250) */
     min-width: 80px;
     max-width: 80px;
-    box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1); /* Shadow to separate frozen columns from scrollable ones */
+    box-shadow: 2px 0 5px -2px rgba(0, 0, 0, 0.1);
 }
 
 /* Hover effects for sticky columns */
 tr:hover .sticky-name,
+tr:hover .sticky-supplier,
 tr:hover .sticky-stock {
     background-color: #fafafa !important;
 }
@@ -207,18 +256,24 @@ thead th {
 }
 
 thead th.sticky-name,
+thead th.sticky-supplier,
 thead th.sticky-stock {
-    z-index: 3; /* Must be higher than body cells and other headers */
+    z-index: 3;
 }
 
-/* Responsive adjustments if needed */
+/* Responsive adjustments */
 @media screen and (max-width: 768px) {
     .sticky-name {
         min-width: 150px;
         max-width: 150px;
     }
-    .sticky-stock {
+    .sticky-supplier {
         left: 150px;
+        min-width: 150px;
+        max-width: 150px;
+    }
+    .sticky-stock {
+        left: 300px;
     }
 }
 </style>

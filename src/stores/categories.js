@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { db } from '../firebase'
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore'
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore'
 
 export const useCategoryStore = defineStore('categories', {
     state: () => ({
@@ -13,7 +13,9 @@ export const useCategoryStore = defineStore('categories', {
         async fetchCategories() {
             this.loading = true
             try {
-                const querySnapshot = await getDocs(collection(db, 'con-categories'))
+                // Modified to sort by name
+                const q = query(collection(db, 'con-categories'), orderBy('name', 'asc'))
+                const querySnapshot = await getDocs(q)
                 this.categories = querySnapshot.docs.map((doc) => ({
                     id: doc.id,
                     ...doc.data(),

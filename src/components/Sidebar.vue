@@ -67,6 +67,9 @@
                 <router-link to="/customers" active-class="is-active">Customers</router-link>
             </li>
             <li>
+                <router-link to="/suppliers" active-class="is-active">Suppliers</router-link>
+            </li>
+            <li>
                 <router-link to="/categories" active-class="is-active">Categories</router-link>
             </li>
             <li>

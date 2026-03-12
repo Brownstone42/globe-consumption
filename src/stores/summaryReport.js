@@ -36,7 +36,7 @@ const normalizeDate = (dateVal) => {
 export const useSummaryReportStore = defineStore('summaryReport', {
     state: () => ({
         loading: false,
-        summaryData: [], // Array of { id, name, categoryId, categoryName, stock, sales: { "YYYY-MM": qty } }
+        summaryData: [], // Array of { id, name, categoryId, categoryName, supplierId, supplierName, supplierCountry, stock, sales: { "YYYY-MM": qty } }
         monthHeaders: [],
     }),
 
@@ -50,9 +50,8 @@ export const useSummaryReportStore = defineStore('summaryReport', {
                 this.monthHeaders = reportMonths
                 const currentMonthStr = reportMonths[reportMonths.length - 1]
 
-                // 1. Fetch Customers (We need all of them now for mapping names/IDs)
+                // 1. Fetch Customers
                 const customerSnap = await getDocs(collection(db, 'con-customers'))
-                // No longer filtering active customers at this level
                 const allCustomerMap = {}
                 customerSnap.docs.forEach((doc) => {
                     allCustomerMap[doc.id] = doc.data()
@@ -63,7 +62,12 @@ export const useSummaryReportStore = defineStore('summaryReport', {
                 const categories = categorySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
                 const categoryMap = new Map(categories.map((c) => [c.id, c.name]))
 
-                // 3. Fetch Products
+                // 3. Fetch Suppliers
+                const supplierSnap = await getDocs(collection(db, 'con-suppliers'))
+                const suppliers = supplierSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+                const supplierMap = new Map(suppliers.map((s) => [s.id, { name: s.name, country: s.country }]))
+
+                // 4. Fetch Products
                 const productSnap = await getDocs(collection(db, 'con-products'))
                 const products = productSnap.docs.map((doc) => {
                     const data = doc.data()
@@ -74,7 +78,7 @@ export const useSummaryReportStore = defineStore('summaryReport', {
                     return { id: doc.id, ...data, categoryId: catId }
                 })
 
-                // 4. Fetch Sales History for the target months
+                // 5. Fetch Sales History for the target months
                 const historyQuery = query(
                     collection(db, 'con-monthly-sales'),
                     where('month', '>=', reportMonths[0]),
@@ -83,18 +87,18 @@ export const useSummaryReportStore = defineStore('summaryReport', {
                 const historySnap = await getDocs(historyQuery)
                 const historyData = historySnap.docs
                     .map((doc) => ({ id: doc.id, ...doc.data() }))
-                    .filter((h) => h.status !== 'inactive') // NEW LOGIC: Filter based on record status, not customer status
+                    .filter((h) => h.status !== 'inactive')
 
-                // 5. Fetch All Current Month POs
+                // 6. Fetch All Current Month POs
                 const startOfMonthStr = `${currentMonthStr}-01`
                 const poQuery = query(
                     collection(db, 'con-po'),
                     where('date', '>=', startOfMonthStr),
                 )
                 const poSnap = await getDocs(poQuery)
-                const poData = poSnap.docs.map((doc) => doc.data()) // No filter by active customer, include all current month POs
+                const poData = poSnap.docs.map((doc) => doc.data())
 
-                // 6. Fetch Stock Updates for all products
+                // 7. Fetch Stock Updates for all products
                 const stockUpdatesQuery = query(
                     collection(db, 'con-stock-updates'),
                     orderBy('countDate', 'desc'),
@@ -108,7 +112,7 @@ export const useSummaryReportStore = defineStore('summaryReport', {
                     }
                 })
 
-                // 7. Fetch all Stock In, POs, and History for accurate stock calculation
+                // 8. Fetch all Stock In, POs, and History for accurate stock calculation
                 const [allStockInSnap, allPoSnap, allHistorySnap] = await Promise.all([
                     getDocs(collection(db, 'con-stock-in')),
                     getDocs(collection(db, 'con-po')),
@@ -119,7 +123,7 @@ export const useSummaryReportStore = defineStore('summaryReport', {
                 const allPoData = allPoSnap.docs.map((doc) => doc.data())
                 const allHistoryData = allHistorySnap.docs.map((doc) => doc.data())
 
-                // Helper to calculate stock for a product (Physical stock is always subtracted regardless of "active/inactive" status in report)
+                // Helper to calculate stock for a product
                 const calculateStock = (productId) => {
                     const lastUpdate = latestStockUpdates[productId]
                     if (!lastUpdate) return 'N/A'
@@ -130,6 +134,7 @@ export const useSummaryReportStore = defineStore('summaryReport', {
                     if (!countDate) return 'N/A'
                     const countMonth = countDate.slice(0, 7)
 
+                    // 1. Add Stock In (Items purchased to replenish stock)
                     allStockInData
                         .filter(
                             (si) =>
@@ -137,32 +142,44 @@ export const useSummaryReportStore = defineStore('summaryReport', {
                         )
                         .forEach((si) => (stock += si.quantity))
 
+                    // 2. Subtract Sales from Monthly History
+                    // Only count history records that are AFTER the count month
                     allHistoryData
                         .filter((h) => h.productId === productId && h.month > countMonth)
                         .forEach((h) => (stock -= h.quantity))
 
+                    // 3. Subtract current POs
                     allPoData
                         .filter((po) => po.productId === productId)
                         .forEach((po) => {
                             const normalizedPoDate = normalizeDate(po.date)
                             if (!normalizedPoDate) return
                             const m = normalizedPoDate.slice(0, 7)
+                            
+                            const isSynced = allHistoryData.some(h => 
+                                h.productId === productId && 
+                                h.month === m && 
+                                h.customerId === po.customerId
+                            )
+
                             if (m === countMonth) {
                                 if (normalizedPoDate > countDate) stock -= po.quantity
                             } else if (m > countMonth) {
-                                stock -= po.quantity
+                                if (!isSynced) {
+                                    stock -= po.quantity
+                                }
                             }
                         })
 
                     return stock
                 }
 
-                // 8. Aggregate Data for all products
+                // 9. Aggregate Data for all products
                 const productSummary = products.map((p) => {
                     const sales = {}
                     reportMonths.forEach((m) => (sales[m] = 0))
 
-                    // Add history sales (only those not marked inactive)
+                    // Add history sales
                     historyData
                         .filter((h) => h.productId === p.id)
                         .forEach((h) => {
@@ -179,16 +196,28 @@ export const useSummaryReportStore = defineStore('summaryReport', {
                             if (normalizedPoDate) {
                                 const m = normalizedPoDate.slice(0, 7)
                                 if (sales[m] !== undefined) {
-                                    sales[m] += po.quantity
+                                    const isAlreadyInHistory = historyData.some(h => 
+                                        h.productId === p.id && 
+                                        h.month === m && 
+                                        h.customerId === po.customerId
+                                    )
+                                    if (!isAlreadyInHistory) {
+                                        sales[m] += po.quantity
+                                    }
                                 }
                             }
                         })
+
+                    const supplierInfo = supplierMap.get(p.supplierId) || { name: '-', country: '' }
 
                     return {
                         id: p.id,
                         name: p.name,
                         categoryId: p.categoryId,
                         categoryName: categoryMap.get(p.categoryId) || 'Unknown',
+                        supplierId: p.supplierId || '',
+                        supplierName: supplierInfo.name,
+                        supplierCountry: supplierInfo.country,
                         stock: calculateStock(p.id),
                         sales: sales,
                     }

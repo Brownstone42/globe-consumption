@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Customers from '../views/master/Customers.vue'
 import Categories from '../views/master/Categories.vue'
+import Suppliers from '../views/master/Suppliers.vue'
 import Products from '../views/master/Products.vue'
 import AddPO from '../views/po/AddPO.vue'
 import ImportPO from '../views/po/ImportPO.vue'
@@ -21,6 +22,7 @@ const router = createRouter({
         { path: '/', name: 'home', component: Dashboard },
         { path: '/customers', name: 'customers', component: Customers },
         { path: '/categories', name: 'categories', component: Categories },
+        { path: '/suppliers', name: 'suppliers', component: Suppliers },
         { path: '/products', name: 'products', component: Products },
         { path: '/po/add', name: 'add-po', component: AddPO },
         { path: '/po/import', name: 'import-po', component: ImportPO },

@@ -76,7 +76,7 @@
                                 }}</span>
                             </td>
                             <td class="has-text-right has-text-weight-bold">
-                                {{ getLastUpdate(product.id).quantity ?? 'N/A' }}
+                                {{ formatNumber(getLastUpdate(product.id).quantity) }}
                             </td>
                             <td>
                                 <div class="control">
@@ -185,6 +185,11 @@ export default {
             const month = String(date.getMonth() + 1).padStart(2, '0')
             const day = String(date.getDate()).padStart(2, '0')
             return `${year}-${month}-${day}`
+        },
+
+        formatNumber(val) {
+            if (val === null || val === undefined || val === '') return 'N/A'
+            return Number(val).toLocaleString()
         },
 
         getLastUpdate(productId) {

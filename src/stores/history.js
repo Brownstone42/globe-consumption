@@ -77,17 +77,22 @@ export const useHistoryStore = defineStore('history', {
             }
         },
 
-        async syncFromPO(targetMonth, previewOnly = true) {
+        async syncFromPO(targetMonth, targetProductId = '', previewOnly = true) {
             this.loading = true
             try {
-                // 1. Check existing data for this month
+                // 1. Check existing data for this month and product
                 const historyRef = collection(db, 'con-monthly-sales')
-                const qExist = query(historyRef, where('month', '==', targetMonth))
+                let qExist = query(historyRef, where('month', '==', targetMonth))
+                
+                if (targetProductId) {
+                    qExist = query(qExist, where('productId', '==', targetProductId))
+                }
+                
                 const existingSnapshot = await getDocs(qExist)
 
                 if (existingSnapshot.docs.length > 0 && !previewOnly) {
                     // If data exists and we are in save mode (not preview), we abort as per requirement
-                    throw new Error(`Data for ${targetMonth} already exists. Cannot overwrite.`)
+                    throw new Error(`Sales record for ${targetMonth}${targetProductId ? ' and selected product' : ''} already exists. Cannot overwrite.`)
                 }
 
                 // 2. Query POs in date range
@@ -99,11 +104,15 @@ export const useHistoryStore = defineStore('history', {
                 const endDate = `${targetMonth}-${lastDay}`
 
                 const poRef = collection(db, 'con-po')
-                const qPO = query(
+                let qPO = query(
                     poRef,
                     where('date', '>=', startDate),
                     where('date', '<=', endDate),
                 )
+                
+                // If specific product selected, we'll filter in memory later or can try more where clauses 
+                // but Firestore doesn't allow multiple range filters on different fields easily.
+                // Since we need to aggregate by customerId_productId anyway, memory filter is fine for most cases.
                 const poSnapshot = await getDocs(qPO)
 
                 // 3. Aggregate Data
@@ -113,6 +122,10 @@ export const useHistoryStore = defineStore('history', {
 
                 poSnapshot.forEach((doc) => {
                     const po = doc.data()
+                    
+                    // Filter by Product if specified
+                    if (targetProductId && po.productId !== targetProductId) return;
+
                     poCount++
 
                     // Handle Single Item Structure (current implementation)
@@ -126,21 +139,6 @@ export const useHistoryStore = defineStore('history', {
                             }
                         }
                         aggMap[key].quantity += Number(po.quantity) || 0
-                    }
-
-                    // Fallback: Handle potential array structure (if exists in future)
-                    else if (po.items && Array.isArray(po.items)) {
-                        po.items.forEach((item) => {
-                            const key = `${po.customerId}_${item.productId}`
-                            if (!aggMap[key]) {
-                                aggMap[key] = {
-                                    customerId: po.customerId,
-                                    productId: item.productId,
-                                    quantity: 0,
-                                }
-                            }
-                            aggMap[key].quantity += Number(item.quantity) || 0
-                        })
                     }
                 })
 
@@ -159,7 +157,7 @@ export const useHistoryStore = defineStore('history', {
                 }
 
                 // 4. Save to Database (Batch write)
-                // We only reach here if existingSnapshot.docs.length === 0 based on requirement
+                // We only reach here if existingSnapshot.docs.length === 0 (for the filter scope)
                 if (results.length > 0) {
                     const batch = writeBatch(db)
                     results.forEach((record) => {

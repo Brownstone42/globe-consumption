@@ -41,7 +41,7 @@
                                 <span v-if="reportStore.loading" class="icon is-small"
                                     ><i class="fas fa-spinner fa-pulse"></i
                                 ></span>
-                                <span v-else>{{ reportStore.currentStock }}</span>
+                                <span v-else>{{ formatNumber(reportStore.currentStock) }}</span>
                             </p>
                         </div>
                     </div>
@@ -106,7 +106,7 @@
                                                 : ''
                                         "
                                     >
-                                        {{ salesByMonth[month].quantity }}
+                                        {{ formatNumber(salesByMonth[month].quantity) }}
                                     </span>
                                 </template>
                                 <template v-else>0</template>
@@ -166,6 +166,10 @@ export default {
             const [year, month] = monthStr.split('-')
             const date = new Date(year, month - 1)
             return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+        },
+        formatNumber(val) {
+            if (val === undefined || val === null || val === '') return '0'
+            return Number(val).toLocaleString()
         },
     },
     mounted() {
