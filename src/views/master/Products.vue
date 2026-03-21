@@ -105,6 +105,7 @@
                                     ></i>
                                 </span>
                             </th>
+                            <th class="col-unit">Stock Unit</th>
                             <th class="col-category">Category</th>
                             <th class="col-supplier">Supplier</th>
                             <th class="has-text-centered col-actions">Actions</th>
@@ -112,7 +113,7 @@
                     </thead>
                     <tbody>
                         <tr v-if="loading">
-                            <td colspan="5" class="has-text-centered py-5">
+                            <td colspan="6" class="has-text-centered py-5">
                                 <span class="icon is-large"
                                     ><i class="fas fa-spinner fa-pulse fa-2x"></i
                                 ></span>
@@ -124,6 +125,12 @@
                                 <strong>{{ product.code }}</strong>
                             </td>
                             <td class="has-text-overflow">{{ product.name }}</td>
+                            <td>
+                                <span class="tag is-light is-warning" v-if="product.stockUnit">
+                                    {{ product.stockUnit }}
+                                </span>
+                                <span v-else class="has-text-grey-light">Not set</span>
+                            </td>
                             <td>
                                 <span class="tag is-info is-light">
                                     {{ getCategoryName(product.categoryId) }}
@@ -152,7 +159,7 @@
                             </td>
                         </tr>
                         <tr v-if="!loading && filteredProducts.length === 0">
-                            <td colspan="5" class="has-text-centered has-text-grey py-5">
+                            <td colspan="6" class="has-text-centered has-text-grey py-5">
                                 No products found matching your criteria.
                             </td>
                         </tr>
@@ -175,17 +182,37 @@
                     <button class="delete" aria-label="close" @click="closeModal"></button>
                 </header>
                 <section class="modal-card-body">
-                    <div class="field">
-                        <label class="label"
-                            >Product Code <span class="has-text-danger">*</span></label
-                        >
-                        <div class="control">
-                            <input
-                                class="input"
-                                type="text"
-                                v-model="form.code"
-                                placeholder="e.g. PD-001"
-                            />
+                    <div class="columns">
+                        <div class="column is-6">
+                            <div class="field">
+                                <label class="label"
+                                    >Product Code <span class="has-text-danger">*</span></label
+                                >
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        type="text"
+                                        v-model="form.code"
+                                        placeholder="e.g. PD-001"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column is-6">
+                            <div class="field">
+                                <label class="label"
+                                    >Stock Unit (Base) <span class="has-text-danger">*</span></label
+                                >
+                                <div class="control">
+                                    <input
+                                        class="input"
+                                        type="text"
+                                        v-model="form.stockUnit"
+                                        placeholder="e.g. Pcs, Box, Pack"
+                                    />
+                                </div>
+                                <p class="help">The unit used for inventory counting</p>
+                            </div>
                         </div>
                     </div>
 
@@ -203,32 +230,84 @@
                         </div>
                     </div>
 
-                    <div class="field">
-                        <label class="label">Category <span class="has-text-danger">*</span></label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select v-model="form.categoryId">
-                                    <option value="" disabled>Select Category</option>
-                                    <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                                        {{ cat.name }}
-                                    </option>
-                                </select>
+                    <div class="columns">
+                        <div class="column is-6">
+                            <div class="field">
+                                <label class="label">Category <span class="has-text-danger">*</span></label>
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select v-model="form.categoryId">
+                                            <option value="" disabled>Select Category</option>
+                                            <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                                                {{ cat.name }}
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="column is-6">
+                            <div class="field">
+                                <label class="label">Supplier <span class="has-text-danger">*</span></label>
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select v-model="form.supplierId">
+                                            <option value="" disabled>Select Supplier</option>
+                                            <option v-for="sup in suppliers" :key="sup.id" :value="sup.id">
+                                                {{ sup.name }} ({{ sup.country }})
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="field">
-                        <label class="label">Supplier <span class="has-text-danger">*</span></label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select v-model="form.supplierId">
-                                    <option value="" disabled>Select Supplier</option>
-                                    <option v-for="sup in suppliers" :key="sup.id" :value="sup.id">
-                                        {{ sup.name }} ({{ sup.country }})
-                                    </option>
-                                </select>
+                    <!-- UOM Conversions -->
+                    <hr />
+                    <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
+                        <label class="label mb-0">Unit Conversions (Optional)</label>
+                        <button class="button is-small is-info" @click="addConversion">
+                            <span class="icon is-small"><i class="fas fa-plus"></i></span>
+                            <span>Add Mapping</span>
+                        </button>
+                    </div>
+                    
+                    <div v-if="form.conversions && form.conversions.length > 0">
+                        <div v-for="(conv, index) in form.conversions" :key="index" class="box is-light p-3 mb-2">
+                            <div class="columns is-vcentered is-mobile">
+                                <div class="column">
+                                    <div class="field">
+                                        <label class="label is-size-7">If Purchase Unit is:</label>
+                                        <div class="control">
+                                            <input class="input is-small" type="text" v-model="conv.purchaseUnit" placeholder="e.g. Box">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="column is-narrow has-text-centered pt-4">
+                                    <span class="icon"><i class="fas fa-arrow-right"></i></span>
+                                </div>
+                                <div class="column">
+                                    <div class="field">
+                                        <label class="label is-size-7">Multiply by (Factor):</label>
+                                        <div class="control">
+                                            <input class="input is-small" type="number" step="0.0001" v-model.number="conv.factor">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="column is-narrow pt-4">
+                                    <button class="button is-small is-danger is-light" @click="removeConversion(index)">
+                                        <span class="icon is-small"><i class="fas fa-times"></i></span>
+                                    </button>
+                                </div>
                             </div>
+                            <p class="is-size-7 has-text-grey mt-1">
+                                1 {{ conv.purchaseUnit || '?' }} = <strong>{{ conv.factor || 0 }}</strong> {{ form.stockUnit || 'Stock Units' }}
+                            </p>
                         </div>
+                    </div>
+                    <div v-else class="has-text-centered py-4 has-background-light is-size-7 has-text-grey">
+                        No custom unit conversions defined.
                     </div>
                 </section>
                 <footer class="modal-card-foot">
@@ -251,6 +330,7 @@ import { mapState, mapActions } from 'pinia'
 import { useProductStore } from '../../stores/products'
 import { useCategoryStore } from '../../stores/categories'
 import { useSupplierStore } from '../../stores/suppliers'
+import jarvis from '../../utils/jarvis'
 
 export default {
     name: 'ProductsView',
@@ -271,8 +351,10 @@ export default {
             form: {
                 code: '',
                 name: '',
+                stockUnit: '',
                 categoryId: '',
                 supplierId: '',
+                conversions: []
             },
         }
     },
@@ -352,15 +434,29 @@ export default {
             this.currentPage = 1
         },
 
+        addConversion() {
+            if (!this.form.conversions) this.form.conversions = [];
+            this.form.conversions.push({
+                purchaseUnit: '',
+                factor: 1
+            });
+        },
+
+        removeConversion(index) {
+            this.form.conversions.splice(index, 1);
+        },
+
         openModal(product = null) {
             if (product) {
                 this.isEditing = true
                 this.editingId = product.id
                 this.form = { 
-                    code: product.code,
-                    name: product.name,
-                    categoryId: product.categoryId,
+                    code: product.code || '',
+                    name: product.name || '',
+                    stockUnit: product.stockUnit || '',
+                    categoryId: product.categoryId || '',
                     supplierId: product.supplierId || '',
+                    conversions: product.conversions ? JSON.parse(JSON.stringify(product.conversions)) : []
                 }
             } else {
                 this.isEditing = false
@@ -368,8 +464,10 @@ export default {
                 this.form = {
                     code: '',
                     name: '',
+                    stockUnit: '',
                     categoryId: '',
                     supplierId: '',
+                    conversions: []
                 }
             }
             this.isModalActive = true
@@ -377,21 +475,31 @@ export default {
 
         closeModal() {
             this.isModalActive = false
-            this.form = { code: '', name: '', categoryId: '', supplierId: '' }
+            this.form = { code: '', name: '', stockUnit: '', categoryId: '', supplierId: '', conversions: [] }
         },
 
         async submitForm() {
-            if (!this.form.code || !this.form.name || !this.form.categoryId || !this.form.supplierId) {
-                alert('Please fill in Code, Name, Category and Supplier')
+            if (!this.form.code || !this.form.name || !this.form.categoryId || !this.form.supplierId || !this.form.stockUnit) {
+                jarvis.toast('Please fill in all required fields (Code, Name, Stock Unit, Category, Supplier)', 'error')
                 return
             }
 
-            if (this.isEditing) {
-                await this.updateProduct(this.editingId, this.form)
-            } else {
-                await this.addProduct(this.form)
+            // Clean conversions
+            if (this.form.conversions) {
+                this.form.conversions = this.form.conversions.filter(c => c.purchaseUnit && c.factor);
             }
-            this.closeModal()
+
+            try {
+                if (this.isEditing) {
+                    await this.updateProduct(this.editingId, this.form)
+                } else {
+                    await this.addProduct(this.form)
+                }
+                jarvis.toast(`Product ${this.isEditing ? 'updated' : 'added'} successfully`)
+                this.closeModal()
+            } catch (error) {
+                jarvis.toast('Error saving product', 'error')
+            }
         },
     },
     mounted() {
@@ -413,23 +521,27 @@ export default {
 }
 
 .col-code {
-    width: 150px;
+    width: 140px;
 }
 
 .col-name {
     width: auto;
 }
 
+.col-unit {
+    width: 100px;
+}
+
 .col-category {
-    width: 150px;
+    width: 130px;
 }
 
 .col-supplier {
-    width: 150px;
+    width: 130px;
 }
 
 .col-actions {
-    width: 120px;
+    width: 100px;
 }
 
 .has-text-overflow {
@@ -445,6 +557,11 @@ export default {
 
 .is-clickable:hover {
     background-color: #f5f5f5;
+}
+
+.box.is-light {
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
 }
 
 @media screen and (max-width: 768px) {

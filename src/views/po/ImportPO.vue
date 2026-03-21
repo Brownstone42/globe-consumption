@@ -23,7 +23,7 @@
 
         <!-- Instructions -->
         <div class="notification is-info is-light">
-            <p><strong>Instructions:</strong> Upload Excel file. Format: <strong>ARXXXXX</strong> in Col A, <strong>SOXXXXXXX</strong> in Col D (Date in Col E), <strong>Product lines</strong> (Seq in Col G, Code in Col H, Qty in Col J).</p>
+            <p><strong>Instructions:</strong> Upload Excel file. Format: <strong>ARXXXXX</strong> in Col A, <strong>SOXXXXXXX</strong> in Col D, <strong>Qty</strong> in Col J, <strong>Unit</strong> in Col K.</p>
         </div>
 
         <div v-if="loadingCustomers || loadingProducts || loading" class="notification is-warning is-light">
@@ -85,18 +85,37 @@
                             <thead>
                                 <tr style="background-color: #fafafa;">
                                     <th width="50" class="has-text-centered">Order</th>
-                                    <th width="220">Product Code</th>
-                                    <th>Product Name</th>
-                                    <th width="100" class="has-text-right">Qty</th>
+                                    <th>Product</th>
+                                    <th width="150" class="has-text-right">Original Qty</th>
+                                    <th width="180" class="has-text-right">Converted Stock Qty</th>
                                     <th width="120" class="has-text-centered">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="(item, itemIdx) in po.items" :key="itemIdx" :class="{'has-background-danger-light': !item.exists}">
                                     <td class="has-text-centered">{{ item.order }}</td>
-                                    <td :class="{'has-text-danger has-text-weight-bold': !item.exists}">{{ item.productCode }}</td>
-                                    <td :class="{'has-text-danger': !item.exists}">{{ item.productName }}</td>
-                                    <td class="has-text-right has-text-weight-bold">{{ item.quantity }}</td>
+                                    <td>
+                                        <div :class="{'has-text-danger has-text-weight-bold': !item.exists}">
+                                            {{ item.productCode }}
+                                        </div>
+                                        <div class="is-size-7 has-text-grey">{{ item.productName }}</div>
+                                    </td>
+                                    <td class="has-text-right">
+                                        <div class="has-text-weight-bold">{{ item.originalQuantity }} {{ item.originalUnit }}</div>
+                                    </td>
+                                    <td class="has-text-right">
+                                        <div class="has-text-primary has-text-weight-bold">
+                                            {{ item.quantity }} {{ item.stockUnit }}
+                                        </div>
+                                        <div v-if="item.conversionNote" class="is-size-7 has-text-info italic">
+                                            <span class="icon is-small"><i class="fas fa-info-circle"></i></span>
+                                            {{ item.conversionNote }}
+                                        </div>
+                                        <div v-if="item.warning" class="is-size-7 has-text-danger">
+                                            <span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span>
+                                            {{ item.warning }}
+                                        </div>
+                                    </td>
                                     <td class="has-text-centered">
                                         <template v-if="!item.exists">
                                             <span class="tag is-danger">Not Found</span>
@@ -178,7 +197,7 @@ export default {
             this.previewData.forEach(po => {
                 if (po.customer.exists) {
                     po.items.forEach(item => {
-                        if (item.exists && item.quantity > 0) count++;
+                        if (item.exists && (item.quantity > 0 || item.originalQuantity > 0)) count++;
                     });
                 }
             });
@@ -297,6 +316,29 @@ export default {
                         const product = this.products.find(p => String(p.code || '').trim() === productCode)
                         const orderNum = parseInt(colGValue)
                         
+                        const rawQty = parseFloat(row[9] || 0)
+                        const rawUnit = String(row[10] || '').trim()
+                        let finalQty = rawQty
+                        let conversionNote = ''
+                        let warning = ''
+
+                        if (product) {
+                            const stockUnit = product.stockUnit || ''
+                            if (stockUnit && rawUnit && rawUnit !== stockUnit) {
+                                // Try to find conversion mapping
+                                const conversion = (product.conversions || []).find(c => 
+                                    c.purchaseUnit.toLowerCase() === rawUnit.toLowerCase()
+                                )
+                                
+                                if (conversion) {
+                                    finalQty = rawQty * conversion.factor
+                                    conversionNote = `x ${conversion.factor} (from ${rawUnit} to ${stockUnit})`
+                                } else {
+                                    warning = `Unit "${rawUnit}" mapping not found. Using raw quantity.`
+                                }
+                            }
+                        }
+
                         // Check for duplicate in existing database
                         const existingOrder = this.orders.find(o => 
                             o.orderId === currentPO.poNumber && 
@@ -309,7 +351,12 @@ export default {
                             productName: product ? product.name : '-',
                             exists: !!product,
                             productId: product ? product.id : null,
-                            quantity: parseFloat(row[9] || 0),
+                            stockUnit: product ? (product.stockUnit || 'Units') : 'Units',
+                            quantity: finalQty, // Converted Qty
+                            originalQuantity: rawQty,
+                            originalUnit: rawUnit,
+                            conversionNote: conversionNote,
+                            warning: warning,
                             isDuplicate: !!existingOrder,
                             existingId: existingOrder ? existingOrder.id : null
                         })
@@ -335,8 +382,8 @@ export default {
             }, 0)
 
             const message = duplicates > 0 
-                ? `Found ${duplicates} existing items. These will be updated with new data. Continue?`
-                : `Save ${this.validItemsCount} new items to database?`
+                ? `Found ${duplicates} existing items. These will be updated with converted stock quantities. Continue?`
+                : `Save ${this.validItemsCount} items to database? (Quantities will be stored in Stock Units)`
 
             if (!await Jarvis.confirm(message)) return
 
@@ -347,13 +394,11 @@ export default {
                 this.previewData.forEach(po => {
                     if (po.customer.exists && po.customer.id) {
                         po.items.forEach(item => {
-                            if (item.exists && item.productId && item.quantity > 0) {
+                            if (item.exists && item.productId && (item.quantity > 0 || item.originalQuantity > 0)) {
                                 let docRef;
                                 if (item.isDuplicate && item.existingId) {
-                                    // Update existing
                                     docRef = doc(db, 'con-po', item.existingId)
                                 } else {
-                                    // Create new
                                     docRef = doc(poCollection)
                                 }
 
@@ -362,12 +407,13 @@ export default {
                                     date: po.poDate,
                                     customerId: po.customer.id,
                                     productId: item.productId,
-                                    quantity: item.quantity,
+                                    quantity: item.quantity, // Save the converted quantity
+                                    originalQuantity: item.originalQuantity,
+                                    originalUnit: item.originalUnit,
                                     order: item.order,
                                     updatedAt: serverTimestamp()
                                 }
 
-                                // Only set createdAt for new items to avoid "undefined" error in batch.set
                                 if (!item.isDuplicate) {
                                     dataToSave.createdAt = serverTimestamp()
                                 }
@@ -379,7 +425,7 @@ export default {
                 })
 
                 await batch.commit()
-                Jarvis.success(`Successfully processed ${this.validItemsCount} items!`)
+                Jarvis.success(`Successfully processed ${this.validItemsCount} items with unit conversions!`)
                 this.clearPreview()
                 await this.fetchOrders()
             } catch (error) {
@@ -408,4 +454,5 @@ export default {
 .overflow-hidden { overflow: hidden; }
 .border-danger { border: 2px solid #ff3860 !important; }
 .has-background-danger-light { background-color: #feecf0 !important; }
+.italic { font-style: italic; }
 </style>
